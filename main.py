@@ -343,4 +343,5 @@ def handle_action(message):
             user_states[user_id] = {}
     
 # Запуск бота
-bot.polling()
+if __name__ == "__main__":
+    bot.polling(none_stop=True)
