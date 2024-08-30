@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 import io
 import pytesseract
+import json
 
 load_dotenv()
 
@@ -86,7 +87,7 @@ def get_number_using_openai(base64_image):
                         break
             base64_image=convert_image_to_base64(cv_image)
             invoice_data=get_invoice_from_image(base64_image)
-            return invoice_data.json()
+            return json.dumps(invoice_data)
         finally:
             # Закрываем изображение и поток
             pil_image.close()
