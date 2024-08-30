@@ -79,8 +79,7 @@ def post_and_process(payload, headers):
             except ValueError:
                 return {'error': 'Response is not a valid JSON'}
         else:
-            except ValueError:
-                return {'error': response.status_code}
+            return {'error': response.status_code}
 
     except requests.RequestException as e:
 
