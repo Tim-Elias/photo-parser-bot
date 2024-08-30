@@ -82,6 +82,7 @@ def post_and_process(payload, headers):
             return {'error': response.status_code}
 
     except requests.RequestException as e:
+        return {'error': e}
 
 # Существует ли уже такой объект в хранилище
 def object_exists(bucket: str, key: str) -> bool:
