@@ -14,9 +14,9 @@ import base64
 from dotenv import load_dotenv
 import os
 import threading
-from ./utils/hash_string import hash_string
+from utils.hash_string import hash_string
 from openai_image_app import get_number_using_openai
-from ./utils/resize_image import resize_image
+from utils.resize_image import resize_image
 
 # Бот для получения фото накладных с последующим сохранением в s3 хранилище и отправкой данных в Базу данных
 
