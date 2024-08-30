@@ -253,12 +253,6 @@ def handle_image(message, user_id, is_document):
                     bot.send_message(user_id, "Это не курьерская накладная.")
                 else:
                     bot.send_message(user_id, f"Не удалось распознать номер.")
-                # # Проверяем, есть ли еще изображения для обработки
-                # if user_images[user_id]:
-                #     # Запускаем обработку следующего изображения
-                #     process_next_image(user_id)
-                # else:
-                #     user_states[user_id] = {}
             else:
                 # Сохраняем изображение и его метаданные
                 image_id = len(user_images[user_id]) + 1
