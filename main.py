@@ -175,15 +175,22 @@ def process_image(user_id, image_id):
         base64_image=image_data['base64_image']
         user_states[user_id] = {'current_image': image_id}
         current_image_id = user_states[user_id]['current_image']
-        if invoice==None:
-            invoice_data=get_number_using_openai(base64_image)
-            invoice=invoice_data['number']
-            error=invoice_data['error']
-        if invoice=="Номер накладной отсутствует":
-            if error:
-                bot.send_message(user_id, "Это не курьерская накладная.")
-            else:
-                bot.send_message(user_id, f"Не удалось распознать номер.")
+        payloads={"Number" : invoice}
+        headers = {'Content-Type': 'application/json'}
+        response=post_and_process(payloads, headers)
+
+        if response.get('status')=='ok':
+            if image_data:
+                markup = types.ReplyKeyboardMarkup(row_width=3)
+                button1 = types.KeyboardButton("Получено от отправителя")
+                button2 = types.KeyboardButton("Доставлено получателю")
+                button3 = types.KeyboardButton("Прочее")
+                markup.add(button1, button2, button3)
+                bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
+
+        else:
+            bot.send_message(user_id, f"Накладная {invoice} не найдена.")
+            # Удаляем текущее изображение из списка
             del user_images[user_id][current_image_id]
             # Проверяем, есть ли еще изображения для обработки
             if user_images[user_id]:
@@ -191,28 +198,6 @@ def process_image(user_id, image_id):
                 process_next_image(user_id)
             else:
                 user_states[user_id] = {}
-        else:
-            payloads={"Number" : invoice}
-            headers = {'Content-Type': 'application/json'}
-            response=post_and_process(payloads, headers)
-            if response.get('status')=='ok':
-                if image_data:
-                    markup = types.ReplyKeyboardMarkup(row_width=3)
-                    button1 = types.KeyboardButton("Получено от отправителя")
-                    button2 = types.KeyboardButton("Доставлено получателю")
-                    button3 = types.KeyboardButton("Прочее")
-                    markup.add(button1, button2, button3)
-                    bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
-            else:
-                bot.send_message(user_id, f"Накладная {invoice} не найдена.")
-                # Удаляем текущее изображение из списка
-                del user_images[user_id][current_image_id]
-                # Проверяем, есть ли еще изображения для обработки
-                if user_images[user_id]:
-                    # Запускаем обработку следующего изображения
-                    process_next_image(user_id)
-                else:
-                    user_states[user_id] = {}
                     
     else:
         bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
@@ -259,14 +244,31 @@ def handle_image(message, user_id, is_document):
             cv_image=resize_image(cv_image, scale_factor=2.0)
             # Обработка изображения
             invoice=get_QR(cv_image)
-            # Сохраняем изображение и его метаданные
-            image_id = len(user_images[user_id]) + 1
-            user_images[user_id][image_id]={
-                    "invoice" : invoice,
-                    "file_extension" : file_extension,
-                    "base64_image" : base64_image,
-                }
-            start_timer(user_id)
+            if invoice==None:
+                invoice_data=get_number_using_openai(base64_image)
+                invoice=invoice_data['number']
+                error=invoice_data['error']
+            if invoice=="Номер накладной отсутствует":
+                if error:
+                    bot.send_message(user_id, "Это не курьерская накладная.")
+                else:
+                    bot.send_message(user_id, f"Не удалось распознать номер.")
+                del user_images[user_id][current_image_id]
+                # Проверяем, есть ли еще изображения для обработки
+                if user_images[user_id]:
+                    # Запускаем обработку следующего изображения
+                    process_next_image(user_id)
+                else:
+                    user_states[user_id] = {}
+            else:
+                # Сохраняем изображение и его метаданные
+                image_id = len(user_images[user_id]) + 1
+                user_images[user_id][image_id]={
+                        "invoice" : invoice,
+                        "file_extension" : file_extension,
+                        "base64_image" : base64_image,
+                    }
+                start_timer(user_id)
         finally:
             # Закрываем изображение и поток
             pil_image.close()
