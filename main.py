@@ -156,9 +156,9 @@ def invoice_processing(message, invoice, base64_image, file_extension, status):
         bot_message="Вы указали прочее."
     if result.get('error')==False:
         if status_s3['status']=='created':
-            bot.send_message(message, f"{bot_message} Скан успешно сохранен и привязан к накладной '{invoice}'. {result.get('data')}")
+            bot.send_message(message, f"{bot_message} Скан успешно сохранен. {result.get('data')}")
         elif status_s3['status']=='exists':
-            bot.send_message(message, f"{bot_message} Скан уже существует и привязан к накладной '{invoice}'. {result.get('data')}")
+            bot.send_message(message, f"{bot_message} Скан уже существует. {result.get('data')}")
         else:
             bot.send_message(message, f"Ошибка при записи в хранилище s3")
     else:
@@ -171,23 +171,23 @@ def process_image(user_id, image_id):
     if user_id in user_images and user_images[user_id]:
         # Отправляем сообщение с выбором дальнейших действий
         image_data = user_images[user_id].get(image_id)
-        invoice=image_data['invoice']
-        base64_image=image_data['base64_image']
+        invoice = image_data['invoice']
+        base64_image = image_data['base64_image']
         user_states[user_id] = {'current_image': image_id}
         current_image_id = user_states[user_id]['current_image']
-        payloads={"Number" : invoice}
+        payloads = {"Number" : invoice}
         headers = {'Content-Type': 'application/json'}
-        response=post_and_process(payloads, headers)
+        response = post_and_process(payloads, headers)
 
-        if response.get('status')=='ok':
+        if response.get('status') == 'ok':
             if image_data:
-                markup = types.ReplyKeyboardMarkup(row_width=3)
-                button1 = types.KeyboardButton("Получено от отправителя")
-                button2 = types.KeyboardButton("Доставлено получателю")
-                button3 = types.KeyboardButton("Прочее")
+                # Создаем Inline клавиатуру
+                markup = types.InlineKeyboardMarkup()
+                button1 = types.InlineKeyboardButton("Получено от отправителя", callback_data="received")
+                button2 = types.InlineKeyboardButton("Доставлено получателю", callback_data="delivered")
+                button3 = types.InlineKeyboardButton("Прочее", callback_data="other")
                 markup.add(button1, button2, button3)
                 bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
-
         else:
             bot.send_message(user_id, f"Накладная {invoice} не найдена.")
             # Удаляем текущее изображение из списка
@@ -198,7 +198,7 @@ def process_image(user_id, image_id):
                 process_next_image(user_id)
             else:
                 user_states[user_id] = {}
-                    
+
     else:
         bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
 
@@ -249,9 +249,7 @@ def handle_image(message, user_id, is_document):
                 invoice=invoice_data['number']
                 error=invoice_data['error']
             if invoice=="Номер накладной отсутствует":
-                if error:
-                    bot.send_message(user_id, "Это не курьерская накладная.")
-                else:
+                if not error:
                     bot.send_message(user_id, f"Не удалось распознать номер.")
             else:
                 # Сохраняем изображение и его метаданные
@@ -284,21 +282,18 @@ bot = telebot.TeleBot(tg_api_token)
 # Обработчик команды /start
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    user_tg_id = message.from_user.id
     bot.reply_to(message, "Привет! Я ваш бот. Чем могу помочь?")
 
 
 # Обработчик фотографий
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    user_tg_id = message.from_user.id
     user_id = message.chat.id
     handle_image(message, user_id, is_document=False)
     
 # Обработчик документов
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
-    user_tg_id = message.from_user.id
     user_id = message.chat.id
     # Проверяем, является ли документ изображением
     file_name = message.document.file_name
@@ -307,28 +302,36 @@ def handle_document(message):
     else:
         bot.reply_to(message, "Пожалуйста, отправьте изображение в формате JPG или PNG.")
 
-# Обработка выбора кнопки
-@bot.message_handler(func=lambda message: message.text in ["Получено от отправителя", "Доставлено получателю", "Прочее"])
-def handle_action(message):
-    user_id = message.chat.id
+
+# Обработчик нажатий на inline-кнопки
+@bot.callback_query_handler(func=lambda call: call.data in ["received", "delivered", "other"])
+def handle_inline_button(call):
+    user_id = call.message.chat.id
     if user_id not in user_states or 'current_image' not in user_states[user_id]:
-        bot.send_message(message.chat.id, "Извините, изображения не найдены. Отправьте новые.")
+        bot.send_message(user_id, "Извините, изображения не найдены. Отправьте новые.")
         return
+
     current_image_id = user_states[user_id]['current_image']
     if user_id in user_images and current_image_id in user_images[user_id]:
         image_data = user_images[user_id][current_image_id]
-        invoice=image_data['invoice']
-        base64_image=image_data['base64_image']
-        file_extension=image_data['file_extension']
-        if message.text == "Получено от отправителя":
-            status="received"
-            invoice_processing(message.chat.id, invoice, base64_image, file_extension, status)
-        elif message.text == "Доставлено получателю":
-            status="delivered"
-            invoice_processing(message.chat.id, invoice, base64_image, file_extension, status)
-        elif message.text == "Прочее":
-            status=""
-            invoice_processing(message.chat.id, invoice, base64_image, file_extension, status)
+        invoice = image_data['invoice']
+        base64_image = image_data['base64_image']
+        file_extension = image_data['file_extension']
+        
+        # Обрабатываем выбранное действие
+        if call.data == "received":
+            status = "received"
+        elif call.data == "delivered":
+            status = "delivered"
+        elif call.data == "other":
+            status = ""
+        
+        # Вызываем функцию обработки накладной
+        invoice_processing(user_id, invoice, base64_image, file_extension, status)
+        
+        # Отправляем уведомление пользователю о получении данных
+        #bot.answer_callback_query(call.id, f"Действие '{call.data}' выбрано для накладной {invoice}.")
+
         # Удаляем текущее изображение из списка
         del user_images[user_id][current_image_id]
         # Проверяем, есть ли еще изображения для обработки
