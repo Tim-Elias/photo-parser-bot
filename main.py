@@ -331,7 +331,9 @@ def handle_inline_button(call):
         
         # Отправляем уведомление пользователю о получении данных
         #bot.answer_callback_query(call.id, f"Действие '{call.data}' выбрано для накладной {invoice}.")
-
+        # Сворачиваем (удаляем) кнопки из сообщения
+        bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+        
         # Удаляем текущее изображение из списка
         del user_images[user_id][current_image_id]
         # Проверяем, есть ли еще изображения для обработки
