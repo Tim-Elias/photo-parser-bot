@@ -199,8 +199,8 @@ def process_image(user_id, image_id):
             else:
                 user_states[user_id] = {}
 
-    else:
-        bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
+    #else:
+        #bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
 
 
 # Запуск обработки следующего изображения
@@ -213,8 +213,8 @@ def process_next_image(user_id):
             # Обрабатываем следующее изображение
             current_image_id = image_ids[0]
             process_image(user_id, current_image_id)
-        else:
-            bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
+        #else:
+            #bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
 
 # Занесение данных об изображении в список изображений
 def handle_image(message, user_id, is_document):
@@ -267,10 +267,10 @@ def handle_image(message, user_id, is_document):
             image_stream.close()
     except Exception as e:
         print(f"Ошибка: {e}")
-        try:
-            bot.reply_to(message, "Произошла ошибка при обработке изображения.")
-        except:
-            print("Произошла ошибка при ответе на сообщение")
+        #try:
+            #bot.reply_to(message, "Произошла ошибка при обработке изображения.")
+        #except:
+            #print("Произошла ошибка при ответе на сообщение")
     finally:
     # Очищаем объекты для освобождения памяти
         del downloaded_file, image_stream, pil_image, cv_image
@@ -299,8 +299,8 @@ def handle_document(message):
     file_name = message.document.file_name
     if file_name.lower().endswith(('.jpg', '.jpeg', '.png')):
         handle_image(message, user_id, is_document=True)
-    else:
-        bot.reply_to(message, "Пожалуйста, отправьте изображение в формате JPG или PNG.")
+    #else:
+        #bot.reply_to(message, "Пожалуйста, отправьте изображение в формате JPG или PNG.")
 
 
 # Обработчик нажатий на inline-кнопки
@@ -308,7 +308,7 @@ def handle_document(message):
 def handle_inline_button(call):
     user_id = call.message.chat.id
     if user_id not in user_states or 'current_image' not in user_states[user_id]:
-        bot.send_message(user_id, "Извините, изображения не найдены. Отправьте новые.")
+        #bot.send_message(user_id, "Извините, изображения не найдены. Отправьте новые.")
         return
 
     current_image_id = user_states[user_id]['current_image']
@@ -333,7 +333,7 @@ def handle_inline_button(call):
         #bot.answer_callback_query(call.id, f"Действие '{call.data}' выбрано для накладной {invoice}.")
         # Сворачиваем (удаляем) кнопки из сообщения
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
-        
+
         # Удаляем текущее изображение из списка
         del user_images[user_id][current_image_id]
         # Проверяем, есть ли еще изображения для обработки
