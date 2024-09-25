@@ -156,11 +156,18 @@ def invoice_processing(message, invoice, base64_image, file_extension, status):
         bot_message="Вы указали прочее."
     if result.get('error')==False:
         if status_s3['status']=='created':
-            bot.send_message(message, f"{bot_message} Скан успешно сохранен. {result.get('data')}")
+            text=f"{bot_message} Скан успешно сохранен. {result.get('data')}"
+            return text
+            #bot.send_message(message, f"{bot_message} Скан успешно сохранен. {result.get('data')}")
         elif status_s3['status']=='exists':
-            bot.send_message(message, f"{bot_message} Скан уже существует. {result.get('data')}")
+            text=f"{bot_message} Скан уже существует. {result.get('data')}"
+            return(f"{bot_message} Скан уже существует. {result.get('data')}")
+            #bot.send_message(message, f"{bot_message} Скан уже существует. {result.get('data')}")
         else:
-            bot.send_message(message, f"Ошибка при записи в хранилище s3")
+            text=f"{bot_message} Скан уже существует. {result.get('data')}"
+            return text
+           
+            
     else:
         error_msg=result.get('error_msg')
         bot.send_message(message, f"Ошибка при записи в 1с. Error: {error_msg}")
@@ -327,10 +334,10 @@ def handle_inline_button(call):
             status = ""
         
         # Вызываем функцию обработки накладной
-        invoice_processing(user_id, invoice, base64_image, file_extension, status)
+        text = invoice_processing(user_id, invoice, base64_image, file_extension, status)
         
         # Отправляем уведомление пользователю о получении данных
-        #bot.answer_callback_query(call.id, f"Действие '{call.data}' выбрано для накладной {invoice}.")
+        bot.answer_callback_query(call.id, f"{text}")
         # Сворачиваем (удаляем) кнопки из сообщения
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
 
