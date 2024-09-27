@@ -295,13 +295,25 @@ def send_welcome(message):
 # Обработчик фотографий
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    user_id = message.chat.id
+    # Проверка, переслано ли сообщение
+    if message.forward_from:
+        # Если сообщение переслано, используем ID оригинального отправителя
+        user_id = message.forward_from.id
+    else:
+        # Иначе используем ID текущего чата (пользователя)
+        user_id = message.chat.id
     handle_image(message, user_id, is_document=False)
     
 # Обработчик документов
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
-    user_id = message.chat.id
+    # Проверка, переслано ли сообщение
+    if message.forward_from:
+        # Если сообщение переслано, используем ID оригинального отправителя
+        user_id = message.forward_from.id
+    else:
+        # Иначе используем ID текущего чата (пользователя)
+        user_id = message.chat.id
     # Проверяем, является ли документ изображением
     file_name = message.document.file_name
     if file_name.lower().endswith(('.jpg', '.jpeg', '.png')):
