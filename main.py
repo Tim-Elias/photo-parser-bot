@@ -170,7 +170,7 @@ def invoice_processing(message, invoice, base64_image, file_extension, status):
             
     else:
         error_msg=result.get('error_msg')
-        bot.send_message(message, f"Ошибка при записи в 1с. Error: {error_msg}")
+        #bot.send_message(message, f"Ошибка при записи в 1с. Error: {error_msg}")
 
 # Обработка изображения
 def process_image(user_id, image_id):
