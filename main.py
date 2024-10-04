@@ -211,7 +211,13 @@ def process_image(user_id, image_id):
                 logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
         else:
             logging.warning(f"Накладная {invoice} не найдена для пользователя {user_id}.")
-            bot.send_message(user_id, f"Накладная {invoice} не найдена.")
+            try:
+                bot.send_message(user_id, f"Накладная {invoice} не найдена.")
+            except telebot.apihelper.ApiTelegramException as e:
+                if e.error_code == 403:
+                    logging.warning(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот был заблокирован.")
+                else:
+                    logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
             # Удаляем текущее изображение из списка
             del user_images[user_id][current_image_id]
             # Проверяем, есть ли еще изображения для обработки
