@@ -17,6 +17,10 @@ import threading
 from utils.hash_string import hash_string
 from openai_image_app import get_number_using_openai
 from utils.resize_image import resize_image
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 # Бот для получения фото накладных с последующим сохранением в s3 хранилище и отправкой данных в Базу данных
 
@@ -120,6 +124,8 @@ def start_timer(user_id):
     # Таймер ждет указанное время, а затем запускает обработку изображений
     user_timers[user_id] = threading.Timer(WAIT_TIME, process_next_image, args=[user_id])
     user_timers[user_id].start()
+    logging.info(f"Таймер запущен для пользователя {user_id} на {WAIT_TIME} секунд.")
+
 
 # Загрузка данных на s3
 def post_s3(data, ext):
@@ -170,44 +176,42 @@ def invoice_processing(message, invoice, base64_image, file_extension, status):
             
     else:
         error_msg=result.get('error_msg')
-        #bot.send_message(message, f"Ошибка при записи в 1с. Error: {error_msg}")
+        logging.error(f"Ошибка при обработке изображения: {error_msg}")
+
 
 # Обработка изображения
 def process_image(user_id, image_id):
     """Функция для обработки изображений после завершения таймера ожидания."""
     if user_id in user_images and user_images[user_id]:
-        # Отправляем сообщение с выбором дальнейших действий
         image_data = user_images[user_id].get(image_id)
+
+        if image_data is None:
+            logging.warning(f"Изображение с ID {image_id} не найдено для пользователя {user_id}.")
+            return
+
         invoice = image_data['invoice']
         base64_image = image_data['base64_image']
         user_states[user_id] = {'current_image': image_id}
         current_image_id = user_states[user_id]['current_image']
-        payloads = {"Number" : invoice}
+        
+        payloads = {"Number": invoice}
         headers = {'Content-Type': 'application/json'}
         response = post_and_process(payloads, headers)
 
         if response.get('status') == 'ok':
-            if image_data:
-                # Создаем Inline клавиатуру
-                markup = types.InlineKeyboardMarkup()
-                button1 = types.InlineKeyboardButton("Получено от отправителя", callback_data="received")
-                button2 = types.InlineKeyboardButton("Доставлено получателю", callback_data="delivered")
-                button3 = types.InlineKeyboardButton("Прочее", callback_data="other")
-                markup.add(button1, button2, button3)
-                bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
-        else:
-            bot.send_message(user_id, f"Накладная {invoice} не найдена.")
-            # Удаляем текущее изображение из списка
-            del user_images[user_id][current_image_id]
-            # Проверяем, есть ли еще изображения для обработки
-            if user_images[user_id]:
-                # Запускаем обработку следующего изображения
-                process_next_image(user_id)
-            else:
-                user_states[user_id] = {}
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton("Получено от отправителя", callback_data="received"),
+                       types.InlineKeyboardButton("Доставлено получателю", callback_data="delivered"),
+                       types.InlineKeyboardButton("Прочее", callback_data="other"))
 
-    #else:
-        #bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
+            bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
+        else:
+            logging.warning(f"Накладная {invoice} не найдена для пользователя {user_id}.")
+            bot.send_message(user_id, f"Накладная {invoice} не найдена.")
+            del user_images[user_id][current_image_id]
+            process_next_image(user_id)
+    else:
+        logging.info(f"У пользователя {user_id} нет изображений для обработки.")
 
 
 # Запуск обработки следующего изображения
@@ -220,8 +224,7 @@ def process_next_image(user_id):
             # Обрабатываем следующее изображение
             current_image_id = image_ids[0]
             process_image(user_id, current_image_id)
-        #else:
-            #bot.send_message(user_id, "Изображения не найдены, отправьте хотя бы одно.")
+        
 
 # Занесение данных об изображении в список изображений
 def handle_image(message, user_id, is_document):
@@ -273,11 +276,7 @@ def handle_image(message, user_id, is_document):
             pil_image.close()
             image_stream.close()
     except Exception as e:
-        print(f"Ошибка: {e}")
-        #try:
-            #bot.reply_to(message, "Произошла ошибка при обработке изображения.")
-        #except:
-            #print("Произошла ошибка при ответе на сообщение")
+        logging.error(f"Ошибка при обработке изображения: {e}")
     finally:
     # Очищаем объекты для освобождения памяти
         del downloaded_file, image_stream, pil_image, cv_image
@@ -327,6 +326,7 @@ def handle_document(message):
 def handle_inline_button(call):
     user_id = call.message.chat.id
     if user_id not in user_states or 'current_image' not in user_states[user_id]:
+        logging.warning(f"Состояние пользователя {user_id} не найдено. Изображения отсутствуют.")
         #bot.send_message(user_id, "Извините, изображения не найдены. Отправьте новые.")
         return
 
@@ -361,6 +361,7 @@ def handle_inline_button(call):
             process_next_image(user_id)
         else:
             user_states[user_id] = {}
+            logging.info(f"Состояние пользователя {user_id} сброшено.")
     
 # Запуск бота
 if __name__ == "__main__":
