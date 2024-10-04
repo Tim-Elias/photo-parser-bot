@@ -269,8 +269,9 @@ def handle_image(message, user_id, is_document):
                         "file_extension" : file_extension,
                         "base64_image" : base64_image,
                     }
+                start_timer(user_id)
             
-            start_timer(user_id)
+            
         finally:
             # Закрываем изображение и поток
             pil_image.close()
