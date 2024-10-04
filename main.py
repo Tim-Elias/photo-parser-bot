@@ -362,6 +362,7 @@ def handle_inline_button(call):
             process_next_image(user_id)
         else:
             user_states[user_id] = {}
+            
             logging.info(f"Состояние пользователя {user_id} сброшено.")
     
 # Запуск бота
