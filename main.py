@@ -150,38 +150,46 @@ def post_s3(data, ext):
         return response
 
 # Обработка накладной
+# Обработка накладной
 def invoice_processing(message, invoice, base64_image, file_extension, status):
-    status_s3, s3_file_key=post_s3(base64_image, file_extension)
+    logging.info(f"Обработка накладной: {invoice}, статус: {status}.")
+    status_s3, s3_file_key = post_s3(base64_image, file_extension)
     headers = {'Content-Type': 'application/json'}
-    result=post_request(invoice, s3_file_key, status, headers)
-    if status=='delivered':
-        bot_message=f"Вы указали, что накладная {invoice} доставлена."
-    elif status=='received':
-        bot_message=f"Вы указали, что накладная {invoice} получена."
+    
+    result = post_request(invoice, s3_file_key, status, headers)
+    logging.info(f"Результат запроса на сервер: {result}")
+
+    if status == 'delivered':
+        bot_message = f"Вы указали, что накладная {invoice} доставлена."
+    elif status == 'received':
+        bot_message = f"Вы указали, что накладная {invoice} получена."
     else:
-        bot_message="Вы указали прочее."
-    if result.get('error')==False:
-        if status_s3['status']=='created':
-            text=f"{bot_message} Скан успешно сохранен. {result.get('data')}"
+        bot_message = "Вы указали прочее."
+    
+    if not result.get('error'):
+        if status_s3['status'] == 'created':
+            text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
+            logging.info(f"Успех: {text}")
             return text
-            #bot.send_message(message, f"{bot_message} Скан успешно сохранен. {result.get('data')}")
-        elif status_s3['status']=='exists':
-            text=f"{bot_message} Скан уже существует. {result.get('data')}"
-            return(f"{bot_message} Скан уже существует. {result.get('data')}")
-            #bot.send_message(message, f"{bot_message} Скан уже существует. {result.get('data')}")
+        elif status_s3['status'] == 'exists':
+            text = f"{bot_message} Скан уже существует. {result.get('data')}"
+            logging.warning(f"Предупреждение: {text}")
+            return text
         else:
-            text=f"{bot_message} Скан уже существует. {result.get('data')}"
+            text = f"{bot_message} Скан уже существует. {result.get('data')}"
+            logging.warning(f"Предупреждение: {text}")
             return text
-           
-            
     else:
-        error_msg=result.get('error_msg')
-        logging.error(f"Ошибка при обработке изображения: {error_msg}")
+        error_msg = result.get('error_msg')
+        logging.error(f"Ошибка при обработке накладной: {error_msg}")
+        return f"Произошла ошибка: {error_msg}"
 
 
 # Обработка изображения
 def process_image(user_id, image_id):
     """Функция для обработки изображений после завершения таймера ожидания."""
+    logging.info(f"Начинаем обработку изображения {image_id} для пользователя {user_id}.")
+    
     if user_id in user_images and user_images[user_id]:
         image_data = user_images[user_id].get(image_id)
 
@@ -197,6 +205,7 @@ def process_image(user_id, image_id):
         payloads = {"Number": invoice}
         headers = {'Content-Type': 'application/json'}
         response = post_and_process(payloads, headers)
+        logging.info(f"Ответ сервера на запрос накладной: {response}")
 
         if response.get('status') == 'ok':
             markup = types.InlineKeyboardMarkup()
@@ -205,6 +214,7 @@ def process_image(user_id, image_id):
                        types.InlineKeyboardButton("Прочее", callback_data="other"))
 
             bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
+            logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
         else:
             logging.warning(f"Накладная {invoice} не найдена для пользователя {user_id}.")
             bot.send_message(user_id, f"Накладная {invoice} не найдена.")
@@ -217,69 +227,67 @@ def process_image(user_id, image_id):
 # Запуск обработки следующего изображения
 def process_next_image(user_id):
     """Функция для обработки следующего изображения."""
+    logging.info(f"Запуск обработки следующего изображения для пользователя {user_id}.")
     if user_id in user_images and user_images[user_id]:
-        # Получаем список всех изображений
         image_ids = list(user_images[user_id].keys())
         if image_ids:
-            # Обрабатываем следующее изображение
             current_image_id = image_ids[0]
             process_image(user_id, current_image_id)
         
 
 # Занесение данных об изображении в список изображений
 def handle_image(message, user_id, is_document):
-    # Если пользователь отправляет первое изображение, создаем пустой словарь
+    logging.info(f"Обработка изображения от пользователя {user_id}.")
+    
     if user_id not in user_images:
         user_images[user_id] = {}
         user_states[user_id] = {}
+    
     try:
         if is_document:
             file_info = bot.get_file(message.document.file_id)
         else:
             file_info = bot.get_file(message.photo[-1].file_id)
-        # Получаем информацию о файле и его содержимом
+
         file_path = file_info.file_path
-        # Определяем расширение файла
         file_extension = file_path.split('.')[-1]
-        # Скачиваем файл в память
         downloaded_file = bot.download_file(file_path)
         image_stream = io.BytesIO(downloaded_file)
+        logging.info(f"Файл {file_path} загружен успешно.")
+        
         try:
             pil_image = Image.open(image_stream)
-            # Проверяем формат изображения
             pil_image = pil_image.convert("RGB")
             cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-            # Преобразование изображения в Base64
             base64_image = convert_image_to_base64(cv_image)
-            cv_image=resize_image(cv_image, scale_factor=2.0)
-            # Обработка изображения
-            invoice=get_QR(cv_image)
-            if invoice==None:
-                invoice_data=get_number_using_openai(base64_image)
-                invoice=invoice_data['number']
-                error=invoice_data['error']
-            if invoice=="Номер накладной отсутствует":
+            cv_image = resize_image(cv_image, scale_factor=2.0)
+            invoice = get_QR(cv_image)
+
+            if invoice is None:
+                invoice_data = get_number_using_openai(base64_image)
+                invoice = invoice_data['number']
+                error = invoice_data['error']
+
+            if invoice == "Номер накладной отсутствует":
                 if not error:
                     bot.send_message(user_id, f"Не удалось распознать номер.")
+                    logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
             else:
-                # Сохраняем изображение и его метаданные
                 image_id = len(user_images[user_id]) + 1
-                user_images[user_id][image_id]={
-                        "invoice" : invoice,
-                        "file_extension" : file_extension,
-                        "base64_image" : base64_image,
-                    }
+                user_images[user_id][image_id] = {
+                    "invoice": invoice,
+                    "file_extension": file_extension,
+                    "base64_image": base64_image,
+                }
+                logging.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
                 start_timer(user_id)
             
-            
         finally:
-            # Закрываем изображение и поток
             pil_image.close()
             image_stream.close()
     except Exception as e:
         logging.error(f"Ошибка при обработке изображения: {e}")
     finally:
-    # Очищаем объекты для освобождения памяти
         del downloaded_file, image_stream, pil_image, cv_image
 
 # Подготовка бота
@@ -295,31 +303,27 @@ def send_welcome(message):
 # Обработчик фотографий
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    # Проверка, переслано ли сообщение
+    logging.info("Обработка фотографии.")
     if message.forward_from:
-        # Если сообщение переслано, используем ID оригинального отправителя
         user_id = message.forward_from.id
     else:
-        # Иначе используем ID текущего чата (пользователя)
         user_id = message.chat.id
     handle_image(message, user_id, is_document=False)
     
 # Обработчик документов
 @bot.message_handler(content_types=['document'])
 def handle_document(message):
-    # Проверка, переслано ли сообщение
+    logging.info("Обработка документа.")
     if message.forward_from:
-        # Если сообщение переслано, используем ID оригинального отправителя
         user_id = message.forward_from.id
     else:
-        # Иначе используем ID текущего чата (пользователя)
         user_id = message.chat.id
-    # Проверяем, является ли документ изображением
+
     file_name = message.document.file_name
     if file_name.lower().endswith(('.jpg', '.jpeg', '.png')):
         handle_image(message, user_id, is_document=True)
-    #else:
-        #bot.reply_to(message, "Пожалуйста, отправьте изображение в формате JPG или PNG.")
+    else:
+        logging.warning(f"Некорректный формат файла для пользователя {user_id}: {file_name}")
 
 
 # Обработчик нажатий на inline-кнопки
@@ -328,7 +332,6 @@ def handle_inline_button(call):
     user_id = call.message.chat.id
     if user_id not in user_states or 'current_image' not in user_states[user_id]:
         logging.warning(f"Состояние пользователя {user_id} не найдено. Изображения отсутствуют.")
-        #bot.send_message(user_id, "Извините, изображения не найдены. Отправьте новые.")
         return
 
     current_image_id = user_states[user_id]['current_image']
@@ -338,7 +341,6 @@ def handle_inline_button(call):
         base64_image = image_data['base64_image']
         file_extension = image_data['file_extension']
         
-        # Обрабатываем выбранное действие
         if call.data == "received":
             status = "received"
         elif call.data == "delivered":
@@ -346,19 +348,16 @@ def handle_inline_button(call):
         elif call.data == "other":
             status = ""
         
-        # Вызываем функцию обработки накладной
+        logging.info(f"Обработка статуса '{status}' для накладной {invoice} от пользователя {user_id}.")
         text = invoice_processing(user_id, invoice, base64_image, file_extension, status)
         
-        # Отправляем уведомление пользователю о получении данных
         bot.answer_callback_query(call.id, f"{text}")
-        # Сворачиваем (удаляем) кнопки из сообщения
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
 
-        # Удаляем текущее изображение из списка
         del user_images[user_id][current_image_id]
-        # Проверяем, есть ли еще изображения для обработки
+        logging.info(f"Изображение {current_image_id} удалено из списка для пользователя {user_id}.")
+        
         if user_images[user_id]:
-            # Запускаем обработку следующего изображения
             process_next_image(user_id)
         else:
             user_states[user_id] = {}
