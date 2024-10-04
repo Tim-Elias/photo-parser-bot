@@ -150,78 +150,80 @@ def post_s3(data, ext):
         return response
 
 # Обработка накладной
-# Обработка накладной
 def invoice_processing(message, invoice, base64_image, file_extension, status):
     logging.info(f"Обработка накладной: {invoice}, статус: {status}.")
-    status_s3, s3_file_key = post_s3(base64_image, file_extension)
+    status_s3, s3_file_key=post_s3(base64_image, file_extension)
     headers = {'Content-Type': 'application/json'}
-    
-    result = post_request(invoice, s3_file_key, status, headers)
+    result=post_request(invoice, s3_file_key, status, headers)
     logging.info(f"Результат запроса на сервер: {result}")
-
-    if status == 'delivered':
-        bot_message = f"Вы указали, что накладная {invoice} доставлена."
-    elif status == 'received':
-        bot_message = f"Вы указали, что накладная {invoice} получена."
+    if status=='delivered':
+        bot_message=f"Вы указали, что накладная {invoice} доставлена."
+    elif status=='received':
+        bot_message=f"Вы указали, что накладная {invoice} получена."
     else:
-        bot_message = "Вы указали прочее."
-    
-    if not result.get('error'):
-        if status_s3['status'] == 'created':
-            text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
+        bot_message="Вы указали прочее."
+    if result.get('error')==False:
+        if status_s3['status']=='created':
+            text=f"{bot_message} Скан успешно сохранен. {result.get('data')}"
             logging.info(f"Успех: {text}")
             return text
-        elif status_s3['status'] == 'exists':
-            text = f"{bot_message} Скан уже существует. {result.get('data')}"
+            
+        elif status_s3['status']=='exists':
+            text=f"{bot_message} Скан уже существует. {result.get('data')}"
             logging.warning(f"Предупреждение: {text}")
-            return text
+            return(f"{bot_message} Скан уже существует. {result.get('data')}")
+            
         else:
-            text = f"{bot_message} Скан уже существует. {result.get('data')}"
+            text=f"{bot_message} Скан уже существует. {result.get('data')}"
             logging.warning(f"Предупреждение: {text}")
-            return text
+            return text     
     else:
-        error_msg = result.get('error_msg')
-        logging.error(f"Ошибка при обработке накладной: {error_msg}")
-        return f"Произошла ошибка: {error_msg}"
+        error_msg=result.get('error_msg')
+        logging.error(f"Ошибка при обработке изображения: {error_msg}")
+
+
 
 
 # Обработка изображения
 def process_image(user_id, image_id):
     """Функция для обработки изображений после завершения таймера ожидания."""
     logging.info(f"Начинаем обработку изображения {image_id} для пользователя {user_id}.")
-    
     if user_id in user_images and user_images[user_id]:
+        # Отправляем сообщение с выбором дальнейших действий
         image_data = user_images[user_id].get(image_id)
-
-        if image_data is None:
-            logging.warning(f"Изображение с ID {image_id} не найдено для пользователя {user_id}.")
-            return
-
         invoice = image_data['invoice']
         base64_image = image_data['base64_image']
         user_states[user_id] = {'current_image': image_id}
         current_image_id = user_states[user_id]['current_image']
-        
-        payloads = {"Number": invoice}
+        payloads = {"Number" : invoice}
         headers = {'Content-Type': 'application/json'}
         response = post_and_process(payloads, headers)
         logging.info(f"Ответ сервера на запрос накладной: {response}")
-
         if response.get('status') == 'ok':
-            markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("Получено от отправителя", callback_data="received"),
-                       types.InlineKeyboardButton("Доставлено получателю", callback_data="delivered"),
-                       types.InlineKeyboardButton("Прочее", callback_data="other"))
-
-            bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
-            logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
+            if image_data:
+                # Создаем Inline клавиатуру
+                markup = types.InlineKeyboardMarkup()
+                button1 = types.InlineKeyboardButton("Получено от отправителя", callback_data="received")
+                button2 = types.InlineKeyboardButton("Доставлено получателю", callback_data="delivered")
+                button3 = types.InlineKeyboardButton("Прочее", callback_data="other")
+                markup.add(button1, button2, button3)
+                bot.send_message(user_id, f"Выберите действие с накладной {invoice}:", reply_markup=markup)
+                logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
         else:
             logging.warning(f"Накладная {invoice} не найдена для пользователя {user_id}.")
             bot.send_message(user_id, f"Накладная {invoice} не найдена.")
+            # Удаляем текущее изображение из списка
             del user_images[user_id][current_image_id]
-            process_next_image(user_id)
-    else:
-        logging.info(f"У пользователя {user_id} нет изображений для обработки.")
+            # Проверяем, есть ли еще изображения для обработки
+            if user_images[user_id]:
+                # Запускаем обработку следующего изображения
+                process_next_image(user_id)
+            else:
+                user_states[user_id] = {}
+                logging.info(f"У пользователя {user_id} нет изображений для обработки.")
+
+
+       
 
 
 # Запуск обработки следующего изображения
@@ -326,6 +328,9 @@ def handle_document(message):
         logging.warning(f"Некорректный формат файла для пользователя {user_id}: {file_name}")
 
 
+
+
+
 # Обработчик нажатий на inline-кнопки
 @bot.callback_query_handler(func=lambda call: call.data in ["received", "delivered", "other"])
 def handle_inline_button(call):
@@ -341,29 +346,33 @@ def handle_inline_button(call):
         base64_image = image_data['base64_image']
         file_extension = image_data['file_extension']
         
+        # Обрабатываем выбранное действие
         if call.data == "received":
             status = "received"
         elif call.data == "delivered":
             status = "delivered"
         elif call.data == "other":
             status = ""
-        
         logging.info(f"Обработка статуса '{status}' для накладной {invoice} от пользователя {user_id}.")
+        # Вызываем функцию обработки накладной
         text = invoice_processing(user_id, invoice, base64_image, file_extension, status)
         
+        # Отправляем уведомление пользователю о получении данных
         bot.answer_callback_query(call.id, f"{text}")
+        # Сворачиваем (удаляем) кнопки из сообщения
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
 
+        # Удаляем текущее изображение из списка
         del user_images[user_id][current_image_id]
         logging.info(f"Изображение {current_image_id} удалено из списка для пользователя {user_id}.")
-        
+        # Проверяем, есть ли еще изображения для обработки
         if user_images[user_id]:
+            # Запускаем обработку следующего изображения
             process_next_image(user_id)
         else:
             user_states[user_id] = {}
-            
             logging.info(f"Состояние пользователя {user_id} сброшено.")
-    
+
 # Запуск бота
 if __name__ == "__main__":
     bot.polling(none_stop=True)
