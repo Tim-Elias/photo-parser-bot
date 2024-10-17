@@ -3,21 +3,22 @@ from aiogram import Bot, Router, types, F  # Используем F для фи�
 from aiogram.filters import Command
 from state import user_images, user_states  # Глобальные переменные для состояния
 from image_processing import handle_image, invoice_processing  # Функции для обработки изображений
+from aiogram.exceptions import TelegramForbiddenError
 
 # Создаем роутер для регистрации хендлеров
 router = Router()
 
-# Обработчик фотографий
 @router.message(F.content_type == 'photo')
 async def handle_photo(message: types.Message, bot: Bot):
     logging.info("Обработка фотографии.")
     user_id = message.from_user.id
     try:
         await handle_image(message, user_id, is_document=False, bot=bot)
+    except TelegramForbiddenError:
+        logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
     except Exception as e:
         logging.error(f"Ошибка при обработке фотографии от пользователя {user_id}: {e}")
 
-# Обработчик документов
 @router.message(F.content_type == 'document')
 async def handle_document(message: types.Message, bot: Bot):
     logging.info("Обработка документа.")
@@ -29,8 +30,11 @@ async def handle_document(message: types.Message, bot: Bot):
             await handle_image(message, user_id, is_document=True, bot=bot)
         else:
             logging.warning(f"Некорректный формат файла для пользователя {user_id}: {file_name}")
+    except TelegramForbiddenError:
+        logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
     except Exception as e:
         logging.error(f"Ошибка при обработке документа от пользователя {user_id}: {e}")
+
 
 # Обработчик callback-кнопок
 @router.callback_query(lambda call: call.data.split(':')[0] in ["received", "delivered", "other"])
@@ -61,8 +65,18 @@ async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
         # Вызываем функцию обработки накладной
         text = await invoice_processing(invoice, image_data.get('base64_image'), image_data.get('file_extension'), action)
 
-        await call.answer(text)
-        await call.message.edit_reply_markup(reply_markup=None)
+
+        try:
+            await call.answer(text)
+            await call.message.edit_reply_markup(reply_markup=None)
+        except TelegramForbiddenError:
+            logging.error(f"Бот не может ответить на запрос пользователя {user_id}. Возможно, бот заблокирован.")
+        except Exception as e:
+            logging.error(f"Ошибка при отправке ответа пользователю {user_id}: {e}")
+
+
+        #await call.answer(text)
+        #await call.message.edit_reply_markup(reply_markup=None)
 
         # Логируем информацию перед удалением изображения
         logging.info(f"Состояние перед удалением изображения {image_id} для пользователя {user_id}.")

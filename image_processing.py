@@ -10,6 +10,7 @@ from openai_image_app import get_number_using_openai
 from utils import convert_image_to_base64, resize_image
 from s3_utils import S3Handler
 from post_requests import post_request
+from aiogram.exceptions import TelegramForbiddenError
 
 s3_handler = S3Handler()
 
@@ -58,10 +59,16 @@ async def handle_image(message, user_id, is_document, bot):
             invoice = invoice_data['number']
             error = invoice_data['error']
 
-        if invoice == "Номер накладной отсутствует":
-            if not error:
-                await bot.send_message(user_id, "Не удалось распознать номер.")
-                logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
+            if invoice == "Номер накладной отсутствует":
+                if not error:
+                    try:
+                        await bot.send_message(user_id, "Не удалось распознать номер.")
+                    except TelegramForbiddenError:
+                        logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                    except Exception as e:
+                        logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+                    logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
+
         else:
             image_id = int(len(user_images[user_id]) + 1)
             user_images[user_id][image_id] = {

@@ -4,6 +4,8 @@ from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from state import user_images, user_states  # Импортируем глобальные переменные для хранения состояний
 from post_requests import post_and_process  # Ваша функция для POST-запроса
+from aiogram.exceptions import TelegramForbiddenError, TelegramAPIError
+
 
 # Функция для обработки изображения
 async def process_image(user_id: int, image_id: int, bot: Bot):
@@ -33,8 +35,16 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
                         [InlineKeyboardButton(text="Прочее", callback_data=f"other:{image_id}")]
                     ]
                 )
-                await bot.send_message(user_id, f"Выберите действие для накладной {invoice}:", reply_markup=markup)
-                logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
+                try:
+                    await bot.send_message(user_id, f"Выберите действие для накладной {invoice}:", reply_markup=markup)
+                    logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
+                except TelegramForbiddenError:
+                    logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+                
+                #await bot.send_message(user_id, f"Выберите действие для накладной {invoice}:", reply_markup=markup)
+                #logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
             else:
                 await bot.send_message(user_id, f"Накладная {invoice} не найдена.")
                 logging.warning(f"Накладная {invoice} не найдена для пользователя {user_id}.")
