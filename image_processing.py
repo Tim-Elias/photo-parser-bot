@@ -14,7 +14,6 @@ from post_requests import post_request
 s3_handler = S3Handler()
 
 async def handle_image(message, user_id, is_document, bot):
-    
     logging.info(f"Обработка изображения от пользователя {user_id}.")
 
     # Проверка состояния пользователя
@@ -36,9 +35,13 @@ async def handle_image(message, user_id, is_document, bot):
         logging.info(f"Файл {file_path} загружен успешно.")
 
         # Открытие и обработка изображения
-        pil_image = Image.open(image_stream)
-        pil_image = pil_image.convert("RGB")
-        cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        try:
+            pil_image = Image.open(image_stream)
+            pil_image = pil_image.convert("RGB")
+            cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        except Exception as e:
+            logging.error(f"Ошибка при открытии или обработке изображения: {e}")
+            return  # Завершить обработку в случае ошибки
 
         # Конвертация изображения в base64
         base64_image = convert_image_to_base64(cv_image)
@@ -60,7 +63,6 @@ async def handle_image(message, user_id, is_document, bot):
                 await bot.send_message(user_id, "Не удалось распознать номер.")
                 logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
         else:
-
             image_id = int(len(user_images[user_id]) + 1)
             user_images[user_id][image_id] = {
                 "invoice": invoice,
@@ -84,35 +86,37 @@ async def handle_image(message, user_id, is_document, bot):
 async def invoice_processing(invoice, base64_image, file_extension, status):
     logging.info(f"Обработка накладной: {invoice}, статус: {status}.")
 
-    status_s3, s3_file_key = await s3_handler.post_s3(base64_image, file_extension)
-    headers = {'Content-Type': 'application/json'}
-    
-    result = await post_request(invoice, s3_file_key, status, headers)  # Теперь это асинхронно
-    logging.info(f"Результат запроса на сервер: {result}")
+    try:
+        status_s3, s3_file_key = await s3_handler.post_s3(base64_image, file_extension)
+        headers = {'Content-Type': 'application/json'}
+        
+        result = await post_request(invoice, s3_file_key, status, headers)  # Теперь это асинхронно
+        logging.info(f"Результат запроса на сервер: {result}")
 
-    # Формируем сообщение пользователю
-    if status == 'delivered':
-        bot_message = f"Вы указали, что накладная {invoice} доставлена."
-    elif status == 'received':
-        bot_message = f"Вы указали, что накладная {invoice} получена."
-    else:
-        bot_message = "Вы указали прочее."
-
-    # Обработка результата
-    if result.get('error') == False:
-        if status_s3['status'] == 'created':
-            text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
-            logging.info(f"Успех: {text}")
-            return text
-        elif status_s3['status'] == 'exists':
-            text = f"{bot_message} Скан уже существует. {result.get('data')}"
-            logging.warning(f"Предупреждение: {text}")
-            return text
+        # Формируем сообщение пользователю
+        if status == 'delivered':
+            bot_message = f"Вы указали, что накладная {invoice} доставлена."
+        elif status == 'received':
+            bot_message = f"Вы указали, что накладная {invoice} получена."
         else:
-            text = f"{bot_message} Скан уже существует. {result.get('data')}"
-            logging.warning(f"Предупреждение: {text}")
-            return text
-    else:
-        error_msg = result.get('error_msg')
-        logging.error(f"Ошибка при обработке изображения: {error_msg}")
+            bot_message = "Вы указали прочее."
 
+        # Обработка результата
+        if result.get('error') == False:
+            if status_s3['status'] == 'created':
+                text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
+                logging.info(f"Успех: {text}")
+                return text
+            elif status_s3['status'] == 'exists':
+                text = f"{bot_message} Скан уже существует. {result.get('data')}"
+                logging.warning(f"Предупреждение: {text}")
+                return text
+            else:
+                text = f"{bot_message} Скан уже существует. {result.get('data')}"
+                logging.warning(f"Предупреждение: {text}")
+                return text
+        else:
+            error_msg = result.get('error_msg')
+            logging.error(f"Ошибка при обработке изображения: {error_msg}")
+    except Exception as e:
+        logging.error(f"Ошибка при обработке накладной: {e}")
