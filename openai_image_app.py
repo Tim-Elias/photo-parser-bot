@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 import openai 
+from openai import AsyncOpenAI
 import base64
 import cv2
 import numpy as np
@@ -9,6 +10,7 @@ import io
 import pytesseract
 import json
 import requests
+from utils import convert_image_to_base64
 
 load_dotenv()
 
@@ -28,19 +30,13 @@ def rotate_image_90_degrees(image, clockwise=False):
     else:
         return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-# Конвертация изображения в base64
-def convert_image_to_base64(image):
-    # Преобразование изображения OpenCV в формат байтов
-    _, buffer = cv2.imencode('.jpg', image)
-    # Преобразование байтов в строку Base64
-    base64_str = base64.b64encode(buffer).decode('utf-8')
-    return base64_str
+
 
 # Извлечение номера накладной с помощью openai
-def get_invoice_from_image(base64_image):
+async def get_invoice_from_image(base64_image):
     try:
         
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {
@@ -63,10 +59,13 @@ def get_invoice_from_image(base64_image):
         print(content)
         return content
     except Exception as e:
-        print(f"Произошла ошибка: {e}")
+        print(f"Произошла общая ошибка: {e}")
+        return {"error": str(e)}
 
 openai.api_key=os.getenv('OPENAI_API_KEY')
-client = openai.OpenAI()
+client = AsyncOpenAI()
+
+
 prompt="""
 {
     "role": "Ты ассистент логиста транспортной компании, ты интегрирован в чат telegram. ТЫ получаешь фотографии из чата",
@@ -97,31 +96,42 @@ prompt="""
 }
 """
 
-def get_number_using_openai(base64_image):
+# Асинхронная функция для обработки изображения и извлечения номера накладной
+async def get_number_using_openai(base64_image):
 
     try:
+        # Декодируем изображение из base64
         image_data = base64.b64decode(base64_image)
         try:
+            # Создаем поток для работы с изображением
             image_stream = io.BytesIO(image_data)
             pil_image = Image.open(image_stream)
-            # Проверяем формат изображения
+            
+            # Конвертируем изображение в формат RGB
             pil_image = pil_image.convert("RGB")
             cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            
+            # Проверка ориентации текста
             if not check_text_orientation(cv_image):
-                # Если текст не читается, поворачиваем изображение
-                for _ in range(3):  # Максимум три поворота
+                # Поворот изображения, если текст не читается
+                for _ in range(3):
                     cv_image = rotate_image_90_degrees(cv_image, clockwise=False)
                     if check_text_orientation(cv_image):
                         break
-            base64_image=convert_image_to_base64(cv_image)
-            invoice_data=get_invoice_from_image(base64_image)
+
+            # Конвертируем изображение обратно в base64
+            base64_image = convert_image_to_base64(cv_image)
+            
+            # Асинхронно извлекаем данные накладной
+            invoice_data = await get_invoice_from_image(base64_image)
             return json.loads(invoice_data)
         finally:
-            # Закрываем изображение и поток
+            # Закрываем изображения и поток
             pil_image.close()
             image_stream.close()
     except requests.RequestException as e:
         return {"error": str(e)}
     finally:
         del image_data, image_stream, pil_image, cv_image
+
     
