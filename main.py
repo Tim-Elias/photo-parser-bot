@@ -1,13 +1,11 @@
-import logging
 import asyncio
 from aiogram import Bot, Dispatcher
-from aiogram.dispatcher.router import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
 import os
 from handlers import router  # Импортируем router из handlers
-
+import logger 
 # Загрузить переменные окружения
 load_dotenv()
 API_TOKEN = os.getenv('TG_API_TOKEN')
@@ -24,7 +22,6 @@ async def handle_start(message: Message):
     await message.answer("Привет, я бот!")
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

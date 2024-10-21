@@ -3,6 +3,7 @@ import aiohttp
 import os
 import logging
 from dotenv import load_dotenv
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -41,11 +42,11 @@ async def post_request(qr_data, s3_file_key, status, headers):
                     try:
                         return json.loads(text_response)  # Пробуем преобразовать в JSON
                     except json.JSONDecodeError as json_error:
-                        logging.error(f"Ошибка при декодировании JSON: {json_error}, текст ответа: {text_response}")
+                        logger.error(f"Ошибка при декодировании JSON: {json_error}, текст ответа: {text_response}")
                         return {'error': f"Неправильный формат ответа: {text_response}"}
                 else:
                     return {'error': f"HTTP Error: {response.status}"}
         except Exception as e:
-            logging.error(f"Ошибка при выполнении POST запроса: {e}")
+            logger.error(f"Ошибка при выполнении POST запроса: {e}")
             return {'error': str(e)}
 

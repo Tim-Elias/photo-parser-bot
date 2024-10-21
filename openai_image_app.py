@@ -12,6 +12,8 @@ import json
 import requests
 from utils import convert_image_to_base64
 import logging
+logger = logging.getLogger(__name__)
+
 
 load_dotenv()
 
@@ -55,10 +57,10 @@ async def get_invoice_from_image(base64_image):
         )
         # Извлечение содержимого content
         content = response.choices[0].message.content
-        logging.info(f"Извлечен номер накладной: {content}.")
+        logger.info(f"Извлечен номер накладной: {content}.")
         return content
     except Exception as e:
-        logging.error(f"Произошла общая ошибка: {e}")
+        logger.error(f"Произошла общая ошибка: {e}")
         return {"error": str(e)}
 
 openai.api_key=os.getenv('OPENAI_API_KEY')

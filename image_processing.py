@@ -14,8 +14,10 @@ from aiogram.exceptions import TelegramForbiddenError
 
 s3_handler = S3Handler()
 
+logger = logging.getLogger(__name__)
+
 async def handle_image(message, user_id, is_document, bot):
-    logging.info(f"Обработка изображения от пользователя {user_id}.")
+    logger.info(f"Обработка изображения от пользователя {user_id}.")
 
     if user_id not in user_images:
         user_images[user_id] = {}
@@ -31,7 +33,7 @@ async def handle_image(message, user_id, is_document, bot):
         downloaded_file = await bot.download_file(file_path)
         image_stream = io.BytesIO(downloaded_file.getvalue())  # Получаем байтовые данные
 
-        logging.info(f"Файл {file_path} загружен успешно.")
+        logger.info(f"Файл {file_path} загружен успешно.")
 
         # Открытие и обработка изображения
         try:
@@ -42,7 +44,7 @@ async def handle_image(message, user_id, is_document, bot):
             cv_image = cv2.cvtColor(np.array(thumbnail), cv2.COLOR_RGB2BGR)
 
         except Exception as e:
-            logging.error(f"Ошибка при открытии или обработке изображения: {e}")
+            logger.error(f"Ошибка при открытии или обработке изображения: {e}")
             return
 
         base64_image = convert_image_to_base64(cv_image)
@@ -58,10 +60,10 @@ async def handle_image(message, user_id, is_document, bot):
                 try:
                     await bot.send_message(user_id, "Не удалось распознать номер.")
                 except TelegramForbiddenError:
-                    logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                    logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
                 except Exception as e:
-                    logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
-                logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
+                    logger.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+                logger.warning(f"Не удалось распознать номер для пользователя {user_id}.")
         else:
             image_id = int(len(user_images[user_id]) + 1)
             user_images[user_id][image_id] = {
@@ -71,24 +73,24 @@ async def handle_image(message, user_id, is_document, bot):
                 "message_id": message.message_id,
                 "pil_image": pil_image  # Сохраняем изображение
             }
-            logging.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
+            logger.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
             await process_image(user_id, image_id, bot)
 
     except Exception as e:
-        logging.error(f"Ошибка при обработке изображения: {e}")
+        logger.error(f"Ошибка при обработке изображения: {e}")
     finally:
         if 'image_stream' in locals():
             image_stream.close()
 
 async def invoice_processing(invoice, base64_image, file_extension, status):
-    logging.info(f"Обработка накладной: {invoice}, статус: {status}.")
+    logger.info(f"Обработка накладной: {invoice}, статус: {status}.")
 
     try:
         status_s3, s3_file_key = await s3_handler.post_s3(base64_image, file_extension)
         headers = {'Content-Type': 'application/json'}
         
         result = await post_request(invoice, s3_file_key, status, headers)  # Теперь это асинхронно
-        logging.info(f"Результат запроса на сервер: {result}")
+        logger.info(f"Результат запроса на сервер: {result}")
 
         # Формируем сообщение пользователю
         if status == 'delivered':
@@ -102,20 +104,20 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
         if result.get('error') == False:
             if status_s3['status'] == 'created':
                 text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
-                logging.info(f"Успех: {text}")
+                logger.info(f"Успех: {text}")
                 return text
             elif status_s3['status'] == 'exists':
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
-                logging.warning(f"Предупреждение: {text}")
+                logger.warning(f"Предупреждение: {text}")
                 return text
             else:
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
-                logging.warning(f"Предупреждение: {text}")
+                logger.warning(f"Предупреждение: {text}")
                 return text, bot_message
         else:
             error_msg = result.get('error_msg')
-            logging.error(f"Ошибка при обработке изображения: {error_msg}")
+            logger.error(f"Ошибка при обработке изображения: {error_msg}")
     except Exception as e:
-        logging.error(f"Ошибка при обработке накладной: {e}")
+        logger.error(f"Ошибка при обработке накладной: {e}")
 
 

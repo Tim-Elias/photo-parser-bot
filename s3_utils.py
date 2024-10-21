@@ -5,6 +5,8 @@ import logging
 from utils import hash_string
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 class S3Handler:
@@ -27,16 +29,16 @@ class S3Handler:
             try:
                 # Проверяем наличие объекта
                 await s3.head_object(Bucket=self.bucket_name, Key=object_key)
-                logging.info(f"Object {object_key} exists.")
+                logger.info(f"Object {object_key} exists.")
                 return True  # Объект существует
             except ClientError as e:
                 # Проверка на ошибку 404 Not Found
                 if e.response['Error']['Code'] == '404':
-                    logging.info(f"Object {object_key} does not exist.")
+                    logger.info(f"Object {object_key} does not exist.")
                     return False  # Объект не существует
                 else:
                     # Логируем другие ошибки
-                    logging.error(f"Error checking object {object_key}: {e}")
+                    logger.error(f"Error checking object {object_key}: {e}")
                     return False  # Возвращаем False при других ошибках
 
     async def post_s3(self, data, ext):
@@ -44,7 +46,7 @@ class S3Handler:
         s3_file_key = f'{hash_value}.{ext}'
 
         if not await self.check_object_exists(s3_file_key):
-            logging.debug(f"Загрузка объекта '{s3_file_key}' в ведро '{self.bucket_name}'")
+            logger.debug(f"Загрузка объекта '{s3_file_key}' в ведро '{self.bucket_name}'")
             async with aioboto3.Session().client(
                     's3',
                     endpoint_url=self.endpoint_url,
@@ -58,11 +60,11 @@ class S3Handler:
                         Body=data.encode('utf-8'),
                         ContentType='application/json'
                     )
-                    logging.info(f"Объект {s3_file_key} успешно загружен в S3.")
+                    logger.info(f"Объект {s3_file_key} успешно загружен в S3.")
                     return {'status': 'created', 'data': s3_file_key}, s3_file_key
                 except Exception as e:
-                    logging.error(f"Ошибка при загрузке в S3: {e}")
+                    logger.error(f"Ошибка при загрузке в S3: {e}")
                     return {'status': 'error', 'error': str(e)}
         else:
-            logging.info(f"Объект {s3_file_key} уже существует в S3.")
+            logger.info(f"Объект {s3_file_key} уже существует в S3.")
             return {'status': 'exists', 'data': s3_file_key}, s3_file_key
