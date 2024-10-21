@@ -96,7 +96,7 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
         elif status == 'received':
             bot_message = f"Вы указали, что накладная {invoice} получена."
         else:
-            bot_message = "Вы указали прочее."
+            bot_message = f"Вы указали прочее для накладной {invoice}."
 
         # Обработка результата
         if result.get('error') == False:
@@ -111,7 +111,7 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
             else:
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
                 logging.warning(f"Предупреждение: {text}")
-                return text
+                return text, bot_message
         else:
             error_msg = result.get('error_msg')
             logging.error(f"Ошибка при обработке изображения: {error_msg}")

@@ -49,7 +49,7 @@ async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
         message_id = image_data.get('message_id')
         logging.info(f"Получен message_id.{message_id}")
         logging.info(f"Обработка статуса '{action}' для накладной {invoice} от пользователя {user_id}.")
-        text = await invoice_processing(invoice, image_data.get('base64_image'), image_data.get('file_extension'), action)
+        text, bot_message = await invoice_processing(invoice, image_data.get('base64_image'), image_data.get('file_extension'), action)
         await call.answer(text)
 
         # Удаляем предыдущее сообщение
@@ -58,7 +58,7 @@ async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
         # Отправляем новое сообщение с ответом на оригинальное
         await bot.send_message(
             chat_id=user_id,
-            text=f"Обработка завершена для накладной {invoice}.",
+            text=f"{bot_message}",
             reply_to_message_id=image_data['message_id']  # Ответ на оригинальное сообщение
         )
         
