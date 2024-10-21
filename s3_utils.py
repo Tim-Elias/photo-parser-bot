@@ -1,6 +1,5 @@
 import aioboto3
 from botocore.exceptions import ClientError
-from botocore.client import Config
 import os
 import logging
 from utils import hash_string
@@ -16,16 +15,6 @@ class S3Handler:
         self.aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
         self.aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 
-    """async def _create_s3_client(self):
-        session = aioboto3.Session()
-        return session.client(
-                's3',
-                endpoint_url=os.getenv('ENDPOINT_URL'),
-                region_name=os.getenv('REGION_NAME'),
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-                config=Config(s3={'addressing_style': 'path'})
-            )"""
 
 
     async def check_object_exists(self, object_key: str) -> bool:

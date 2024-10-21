@@ -17,12 +17,10 @@ s3_handler = S3Handler()
 async def handle_image(message, user_id, is_document, bot):
     logging.info(f"Обработка изображения от пользователя {user_id}.")
 
-    # Проверка состояния пользователя
     if user_id not in user_images:
         user_images[user_id] = {}
 
     try:
-        # Получение информации о файле
         if is_document:
             file_info = await bot.get_file(message.document.file_id)
         else:
@@ -38,55 +36,47 @@ async def handle_image(message, user_id, is_document, bot):
         # Открытие и обработка изображения
         try:
             pil_image = Image.open(image_stream)
-            pil_image = pil_image.convert("RGB")
-            cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            pil_image = pil_image.convert("RGB")  # Убедимся, что изображение в RGB формате
+
+            thumbnail = resize_image(pil_image, scale_factor=0.5)  # Уменьшаем изображение
+            cv_image = cv2.cvtColor(np.array(thumbnail), cv2.COLOR_RGB2BGR)
+
         except Exception as e:
             logging.error(f"Ошибка при открытии или обработке изображения: {e}")
-            return  # Завершить обработку в случае ошибки
+            return
 
-        # Конвертация изображения в base64
         base64_image = convert_image_to_base64(cv_image)
-
-        # Увеличение размера изображения
-        cv_image = resize_image(cv_image, scale_factor=2.0)
-
-        # Извлечение номера накладной
         invoice = get_QR(cv_image)
 
-        # Если номер накладной не найден, используем OpenAI
         if invoice is None:
             invoice_data = await get_number_using_openai(base64_image)
             invoice = invoice_data['number']
             error = invoice_data['error']
 
-            if invoice == "Номер накладной отсутствует":
-                if not error:
-                    try:
-                        await bot.send_message(user_id, "Не удалось распознать номер.")
-                    except TelegramForbiddenError:
-                        logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
-                    except Exception as e:
-                        logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
-                    logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
-
+        if invoice == "Номер накладной отсутствует":
+            if not error:
+                try:
+                    await bot.send_message(user_id, "Не удалось распознать номер.")
+                except TelegramForbiddenError:
+                    logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+                logging.warning(f"Не удалось распознать номер для пользователя {user_id}.")
         else:
             image_id = int(len(user_images[user_id]) + 1)
             user_images[user_id][image_id] = {
                 "invoice": invoice,
                 "file_extension": file_extension,
                 "base64_image": base64_image,
+                "message_id": message.message_id,
+                "pil_image": pil_image  # Сохраняем изображение
             }
             logging.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
-
-            # Запускаем обработку изображения сразу после сохранения
-            await process_image(user_id, image_id, bot)  # Исправлено на process_image
+            await process_image(message, user_id, image_id, bot)
 
     except Exception as e:
         logging.error(f"Ошибка при обработке изображения: {e}")
     finally:
-        # Закрытие потоков изображения
-        if 'pil_image' in locals():
-            pil_image.close()
         if 'image_stream' in locals():
             image_stream.close()
 
@@ -127,3 +117,5 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
             logging.error(f"Ошибка при обработке изображения: {error_msg}")
     except Exception as e:
         logging.error(f"Ошибка при обработке накладной: {e}")
+
+

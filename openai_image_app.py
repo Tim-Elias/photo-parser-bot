@@ -11,6 +11,7 @@ import pytesseract
 import json
 import requests
 from utils import convert_image_to_base64
+import logging
 
 load_dotenv()
 
@@ -29,8 +30,6 @@ def rotate_image_90_degrees(image, clockwise=False):
         return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
     else:
         return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
-
 
 # Извлечение номера накладной с помощью openai
 async def get_invoice_from_image(base64_image):
@@ -56,15 +55,14 @@ async def get_invoice_from_image(base64_image):
         )
         # Извлечение содержимого content
         content = response.choices[0].message.content
-        print(content)
+        logging.info(f"Извлечен номер накладной: {content}.")
         return content
     except Exception as e:
-        print(f"Произошла общая ошибка: {e}")
+        logging.error(f"Произошла общая ошибка: {e}")
         return {"error": str(e)}
 
 openai.api_key=os.getenv('OPENAI_API_KEY')
 client = AsyncOpenAI()
-
 
 prompt="""
 {
@@ -98,7 +96,6 @@ prompt="""
 
 # Асинхронная функция для обработки изображения и извлечения номера накладной
 async def get_number_using_openai(base64_image):
-
     try:
         # Декодируем изображение из base64
         image_data = base64.b64decode(base64_image)

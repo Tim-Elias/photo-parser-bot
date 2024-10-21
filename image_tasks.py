@@ -1,25 +1,23 @@
-# image_tasks.py
 import logging
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from state import user_images, user_states  # Импортируем глобальные переменные для хранения состояний
 from post_requests import post_and_process  # Ваша функция для POST-запроса
-from aiogram.exceptions import TelegramForbiddenError, TelegramAPIError
+from utils import resize_image
+from io import BytesIO
+from aiogram.types import BufferedInputFile 
 
 
 # Функция для обработки изображения
 async def process_image(user_id: int, image_id: int, bot: Bot):
     logging.info(f"Начинаем обработку изображения {image_id} для пользователя {user_id}.")
     
-    # Логируем краткое состояние user_images перед обработкой
-    if user_id in user_images:
-        logging.info(f"Пользователь {user_id} имеет {len(user_images[user_id])} изображений для обработки.")
-    
     if user_id in user_images and user_images[user_id]:
         image_data = user_images[user_id].get(image_id)
 
         if image_data:
             invoice = image_data['invoice']
+            pil_image = image_data['pil_image']  # Получаем изображение
             payloads = {"Number": invoice}
             headers = {'Content-Type': 'application/json'}
 
@@ -27,35 +25,58 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
             logging.info(f"Ответ сервера на запрос накладной: {response.get('status')}")
 
             if response.get('status') == 'ok':
-                # Отправка сообщения с выбором действий
-                markup = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [InlineKeyboardButton(text="Получено", callback_data=f"received:{image_id}")],
-                        [InlineKeyboardButton(text="Доставлено", callback_data=f"delivered:{image_id}")],
-                        [InlineKeyboardButton(text="Прочее", callback_data=f"other:{image_id}")]
-                    ]
-                )
                 try:
-                    await bot.send_message(user_id, f"Выберите действие для накладной {invoice}:", reply_markup=markup)
+                    # Преобразование изображения в уменьшенную копию
+                    thumbnail = resize_image(pil_image, scale_factor=0.5)
+
+                    # Сохраняем уменьшенное изображение в буфер
+                    image_buffer = BytesIO()
+                    thumbnail.save(image_buffer, format='JPEG')
+                    image_buffer.seek(0)  # Не забываем перемещать указатель в начало буфера
+
+                    # Добавляем логирование для отладки
+                    logging.info(f"Буфер изображения готов, размер: {image_buffer.getbuffer().nbytes} байт")
+
+                    # Создаем объект BufferedInputFile для корректного использования в aiogram
+                    input_file = BufferedInputFile(image_buffer.getvalue(), filename='thumbnail.jpg')
+
+                    # Отправка уменьшенной копии изображения
+                    sent_message = await bot.send_photo(
+                            user_id,
+                            input_file,
+                            caption=f"Выберите действие для накладной {invoice}:",  # Текст с описанием
+                            reply_to_message_id=image_data['message_id'],  # Ответ на оригинальное сообщение
+                            reply_markup=InlineKeyboardMarkup(
+                                inline_keyboard=[
+                                    [InlineKeyboardButton(text="Получено", callback_data=f"received:{image_id}")],
+                                    [InlineKeyboardButton(text="Доставлено", callback_data=f"delivered:{image_id}")],
+                                    [InlineKeyboardButton(text="Прочее", callback_data=f"other:{image_id}")]
+                                ]
+                            )
+                        )
+                    image_data['new_message_id'] = sent_message.message_id
+                    # Сохраняем как message_id, так и caption для редактирования позже
+
+                    image_data['caption'] = sent_message.caption  # Сохраняем caption
                     logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
-                except TelegramForbiddenError:
-                    logging.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                    logging.info(f"Отправлено сообщение c message_id: {image_data['message_id']}.")
                 except Exception as e:
-                    logging.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
-                
-                #await bot.send_message(user_id, f"Выберите действие для накладной {invoice}:", reply_markup=markup)
-                #logging.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
+                    logging.error(f"Ошибка при обработке изображения: {e}")
+                finally:
+                    image_buffer.close()
             else:
-                await bot.send_message(user_id, f"Накладная {invoice} не найдена.")
-                logging.warning(f"Накладная {invoice} не найдена для пользователя {user_id}.")
-                # Удаляем изображение из списка
+                await bot.send_message(
+                    user_id,
+                    f"Накладная {invoice} не найдена.",
+                    reply_to_message_id=image_data['message_id']
+                )
                 del user_images[user_id][image_id]
-                logging.info(f"Изображение {image_id} удалено из списка для пользователя {user_id}.")
-                # Логируем краткое состояние user_images после обработки
-                if user_id in user_images:
-                    logging.info(f"Пользователь {user_id} теперь имеет {len(user_images[user_id])} изображений.")
                 if not user_images[user_id]:
                     user_states[user_id] = {}
                     logging.info(f"У пользователя {user_id} нет изображений для обработки.")
+
+
+
+
 
 
