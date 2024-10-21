@@ -1,6 +1,7 @@
 import cv2
 import base64
 from pyzbar.pyzbar import decode
+from PIL import Image
 
 def convert_image_to_base64(image):
     _, buffer = cv2.imencode('.jpg', image)
@@ -14,9 +15,15 @@ def get_QR(image):
     return None
 
 def resize_image(image, scale_factor):
-    width = int(image.shape[1] * scale_factor)
-    height = int(image.shape[0] * scale_factor)
-    return cv2.resize(image, (width, height))
+    # Получаем размеры исходного изображения
+    width, height = image.size
+    # Вычисляем новые размеры
+    new_size = (int(width * scale_factor), int(height * scale_factor))
+    # Изменяем размер изображения с использованием LANCZOS
+    resized_image = image.resize(new_size, Image.LANCZOS)  # Используем LANCZOS для более качественного уменьшения
+    return resized_image
+
+
 
 
 import hashlib
