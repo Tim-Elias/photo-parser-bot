@@ -1,7 +1,7 @@
 import logging
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from state import user_images, user_states  # Импортируем глобальные переменные для хранения состояний
+from state import images # Импортируем глобальные переменные для хранения состояний
 from post_requests import post_and_process  # Ваша функция для POST-запроса
 from utils import resize_image
 from io import BytesIO
@@ -9,11 +9,11 @@ from aiogram.types import BufferedInputFile
 logger = logging.getLogger(__name__)
 
 # Функция для обработки изображения
-async def process_image(user_id: int, image_id: int, bot: Bot):
-    logger.info(f"Начинаем обработку изображения {image_id} для пользователя {user_id}.")
+async def process_image(chat_id, image_id: str, bot: Bot):
+    logger.info(f"Начинаем обработку изображения {image_id}.")
     
-    if user_id in user_images and user_images[user_id]:
-        image_data = user_images[user_id].get(image_id)
+    if image_id in images:
+        image_data = images[image_id]
 
         if image_data:
             invoice = image_data['invoice']
@@ -42,7 +42,7 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
 
                     # Отправка уменьшенной копии изображения
                     sent_message = await bot.send_photo(
-                            user_id,
+                            chat_id,
                             input_file,
                             caption=f"Выберите действие для накладной {invoice}:",  # Текст с описанием
                             reply_to_message_id=image_data['message_id'],  # Ответ на оригинальное сообщение
@@ -58,7 +58,7 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
                     # Сохраняем как message_id, так и caption для редактирования позже
 
                     image_data['caption'] = sent_message.caption  # Сохраняем caption
-                    logger.info(f"Отправлено сообщение пользователю {user_id} с выбором действий.")
+                    logger.info(f"Отправлено сообщение в чат {chat_id} с выбором действий.")
                     logger.info(f"Отправлено сообщение c message_id: {image_data['message_id']}.")
                 except Exception as e:
                     logger.error(f"Ошибка при обработке изображения: {e}")
@@ -66,14 +66,12 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
                     image_buffer.close()
             else:
                 await bot.send_message(
-                    user_id,
+                    chat_id,
                     f"Накладная {invoice} не найдена.",
                     reply_to_message_id=image_data['message_id']
                 )
-                del user_images[user_id][image_id]
-                if not user_images[user_id]:
-                    user_states[user_id] = {}
-                    logger.info(f"У пользователя {user_id} нет изображений для обработки.")
+                del images[image_id]
+                
 
 
 

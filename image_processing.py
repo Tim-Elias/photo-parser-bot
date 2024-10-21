@@ -4,24 +4,22 @@ from PIL import Image
 import numpy as np
 import cv2
 from utils import get_QR
-from state import user_images  # Импортируем данные о пользователях из state
+from state import images  # Импортируем данные о пользователях из state
 from image_tasks import process_image  # Можно безопасно импортировать процессор изображения
 from openai_image_app import get_number_using_openai
 from utils import convert_image_to_base64, resize_image
 from s3_utils import S3Handler
 from post_requests import post_request
 from aiogram.exceptions import TelegramForbiddenError
+import uuid
 
 s3_handler = S3Handler()
 
 logger = logging.getLogger(__name__)
 
-async def handle_image(message, user_id, is_document, bot):
-    logger.info(f"Обработка изображения от пользователя {user_id}.")
-
-    if user_id not in user_images:
-        user_images[user_id] = {}
-
+async def handle_image(message, image_id, is_document, bot):
+    logger.info(f"Обработка изображения {image_id}.")
+    chat_id=message.chat.id
     try:
         if is_document:
             file_info = await bot.get_file(message.document.file_id)
@@ -58,23 +56,23 @@ async def handle_image(message, user_id, is_document, bot):
         if invoice == "Номер накладной отсутствует":
             if not error:
                 try:
-                    await bot.send_message(user_id, "Не удалось распознать номер.")
+                    await bot.send_message(chat_id, "Не удалось распознать номер.")
                 except TelegramForbiddenError:
-                    logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                    logger.error(f"Бот не может отправить сообщение пв чат {chat_id}. Возможно, бот заблокирован.")
                 except Exception as e:
-                    logger.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
-                logger.warning(f"Не удалось распознать номер для пользователя {user_id}.")
+                    logger.error(f"Ошибка при отправке сообщения в чат {chat_id}: {e}")
+                logger.warning(f"Не удалось распознать номер для чата {chat_id}.")
         else:
-            image_id = int(len(user_images[user_id]) + 1)
-            user_images[user_id][image_id] = {
+             
+            images[image_id] = {
                 "invoice": invoice,
                 "file_extension": file_extension,
                 "base64_image": base64_image,
                 "message_id": message.message_id,
                 "pil_image": pil_image  # Сохраняем изображение
             }
-            logger.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
-            await process_image(user_id, image_id, bot)
+            logger.info(f"Изображение сохранено: {image_id} для чата {chat_id} с накладной {invoice}.")
+            await process_image(chat_id, image_id, bot)
 
     except Exception as e:
         logger.error(f"Ошибка при обработке изображения: {e}")
@@ -105,11 +103,11 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
             if status_s3['status'] == 'created':
                 text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
                 logger.info(f"Успех: {text}")
-                return text
+                return text, bot_message
             elif status_s3['status'] == 'exists':
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
                 logger.warning(f"Предупреждение: {text}")
-                return text
+                return text, bot_message
             else:
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
                 logger.warning(f"Предупреждение: {text}")
