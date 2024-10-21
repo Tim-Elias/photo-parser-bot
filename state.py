@@ -1,4 +1,5 @@
 # state.py
 # Хранилище для пользовательских данных и состояний
 
-images = {}
+user_images = {}
+user_states = {}

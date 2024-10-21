@@ -1,71 +1,72 @@
 import logging
 from aiogram import Bot, Router, types, F  # Используем F для фильтрации
-from state import images  # Глобальные переменные для состояния
+from state import user_images, user_states  # Глобальные переменные для состояния
 from image_processing import handle_image, invoice_processing  # Функции для обработки изображений
 from aiogram.exceptions import TelegramForbiddenError
 logger = logging.getLogger(__name__)
-import uuid
 # Создаем роутер для регистрации хендлеров
 router = Router()
 
 @router.message(F.content_type == 'photo')
 async def handle_photo(message: types.Message, bot: Bot):
     logger.info("Обработка фотографии.")
-    
-    image_id = str(uuid.uuid4())
+    user_id = int(message.from_user.id)
     try:
-        await handle_image(message, image_id, is_document=False, bot=bot)
+        await handle_image(message, user_id, is_document=False, bot=bot)
     except TelegramForbiddenError:
-        logger.error(f"Бот не может отправить сообщение пользователю {image_id}. Возможно, бот заблокирован.")
+        logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
     except Exception as e:
-        logger.error(f"Ошибка при обработке фотографии от пользователя {image_id}: {e}")
+        logger.error(f"Ошибка при обработке фотографии от пользователя {user_id}: {e}")
 
 @router.message(F.content_type == 'document')
 async def handle_document(message: types.Message, bot: Bot):
     logger.info("Обработка документа.")
-    image_id = str(uuid.uuid4())
+    user_id = int(message.from_user.id)
     file_name = message.document.file_name
 
     try:
         if file_name.lower().endswith(('.jpg', '.jpeg', '.png')):
-            await handle_image(message, image_id, is_document=True, bot=bot)
+            await handle_image(message, user_id, is_document=True, bot=bot)
         else:
-            logger.warning(f"Некорректный формат файла для пользователя {image_id}: {file_name}")
+            logger.warning(f"Некорректный формат файла для пользователя {user_id}: {file_name}")
     except TelegramForbiddenError:
-        logger.error(f"Бот не может отправить сообщение пользователю {image_id}. Возможно, бот заблокирован.")
+        logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
     except Exception as e:
-        logger.error(f"Ошибка при обработке документа от пользователя {image_id}: {e}")
+        logger.error(f"Ошибка при обработке документа от пользователя {user_id}: {e}")
 
 
 # Обработчик callback-кнопок
 @router.callback_query(lambda call: call.data.split(':')[0] in ["received", "delivered", "other"])
 async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
-    chat_id = call.message.chat.id
+    user_id = call.message.chat.id
     action, image_id = call.data.split(':')
-    logger.info(f"Получен запрос для изображения {image_id} с действием {action}.")
+    logger.info(f"Получен запрос от пользователя {user_id} для изображения {image_id} с действием {action}.")
     try:
-        if image_id not in images:
+        if user_id not in user_images or int(image_id) not in user_images[user_id]:
             return
-        image_data = images[image_id]
+        image_data = user_images[user_id][int(image_id)]
         invoice = image_data['invoice']
         message_id = image_data.get('message_id')
         logger.info(f"Получен message_id.{message_id}")
-        logger.info(f"Обработка статуса '{action}' для накладной {invoice} в чате {chat_id}.")
+        logger.info(f"Обработка статуса '{action}' для накладной {invoice} от пользователя {user_id}.")
         text, bot_message = await invoice_processing(invoice, image_data.get('base64_image'), image_data.get('file_extension'), action)
         await call.answer(text)
 
         # Удаляем предыдущее сообщение
-        await bot.delete_message(chat_id=chat_id, message_id=image_data['new_message_id'])
+        await bot.delete_message(chat_id=user_id, message_id=image_data['new_message_id'])
 
         # Отправляем новое сообщение с ответом на оригинальное
         await bot.send_message(
-            chat_id=chat_id,
+            chat_id=user_id,
             text=f"{bot_message}",
             reply_to_message_id=image_data['message_id']  # Ответ на оригинальное сообщение
         )
         
 
-        del images[image_id]
+        del user_images[user_id][int(image_id)]
+
+        if not user_images[user_id]:
+            del user_states[user_id]
 
     except Exception as e:
-        logger.error(f"Ошибка при обработке callback-кнопки в чате {chat_id}: {e}")
+        logger.error(f"Ошибка при обработке callback-кнопки от пользователя {user_id}: {e}")
