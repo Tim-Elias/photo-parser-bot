@@ -2,3 +2,4 @@ aiogram
 aiohttp
 openai
 aioboto3
+Pillow

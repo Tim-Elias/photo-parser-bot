@@ -18,7 +18,7 @@ async def post_and_process(payload, headers):
                 if response.status == 200:
                     text_response = await response.text()  # Получаем текст
                     try:
-                        logging.info(f"Статус ответа: {response.status}, текст ответа {response.text()}")
+                        logging.info(f"Статус ответа: {response.status}")
                         return json.loads(text_response)  # Пробуем преобразовать в JSON
                     except json.JSONDecodeError as json_error:
                         logging.error(f"Ошибка при декодировании JSON: {json_error}")
@@ -42,7 +42,7 @@ async def post_request(qr_data, s3_file_key, status, headers):
                 
                 
                 if response.status == 200:
-                    logging.info(f"Статус ответа: {response.status}, текст ответа {response.text()}")
+                    logging.info(f"Статус ответа: {response.status}")
                     text_response = await response.text()  # Получаем текст
                     try:
                         return json.loads(text_response)  # Пробуем преобразовать в JSON
