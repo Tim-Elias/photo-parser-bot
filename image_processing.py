@@ -4,13 +4,14 @@ from PIL import Image
 import numpy as np
 import cv2
 from utils import get_QR
-from state import user_images  # Импортируем данные о пользователях из state
+from state import images  # Импортируем данные о пользователях из state
 from image_tasks import process_image  # Можно безопасно импортировать процессор изображения
 from openai_image_app import get_number_using_openai
 from utils import convert_image_to_base64, resize_image
 from s3_utils import S3Handler
 from post_requests import post_request
 from aiogram.exceptions import TelegramForbiddenError
+import uuid
 
 s3_handler = S3Handler()
 
@@ -19,8 +20,6 @@ logger = logging.getLogger(__name__)
 async def handle_image(message, user_id, is_document, bot):
     logger.info(f"Обработка изображения от пользователя {user_id}.")
 
-    if user_id not in user_images:
-        user_images[user_id] = {}
 
     try:
         if is_document:
@@ -65,13 +64,15 @@ async def handle_image(message, user_id, is_document, bot):
                     logger.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
                 logger.warning(f"Не удалось распознать номер для пользователя {user_id}.")
         else:
-            image_id = int(len(user_images[user_id]) + 1)
-            user_images[user_id][image_id] = {
+            
+            image_id = str(uuid.uuid4())
+            images[image_id] = {
                 "invoice": invoice,
                 "file_extension": file_extension,
                 "base64_image": base64_image,
                 "message_id": message.message_id,
-                "pil_image": pil_image  # Сохраняем изображение
+                "pil_image": pil_image,  # Сохраняем изображение
+                "user_id": user_id
             }
             logger.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
             await process_image(user_id, image_id, bot)
@@ -105,11 +106,11 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
             if status_s3['status'] == 'created':
                 text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
                 logger.info(f"Успех: {text}")
-                return text
+                return text, bot_message
             elif status_s3['status'] == 'exists':
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
                 logger.warning(f"Предупреждение: {text}")
-                return text
+                return text, bot_message
             else:
                 text = f"{bot_message} Скан уже существует. {result.get('data')}"
                 logger.warning(f"Предупреждение: {text}")

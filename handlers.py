@@ -1,8 +1,9 @@
 import logging
 from aiogram import Bot, Router, types, F  # Используем F для фильтрации
-from state import user_images, user_states  # Глобальные переменные для состояния
+from state import images, user_states  # Глобальные переменные для состояния
 from image_processing import handle_image, invoice_processing  # Функции для обработки изображений
 from aiogram.exceptions import TelegramForbiddenError
+
 logger = logging.getLogger(__name__)
 # Создаем роутер для регистрации хендлеров
 router = Router()
@@ -42,9 +43,9 @@ async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
     action, image_id = call.data.split(':')
     logger.info(f"Получен запрос от пользователя {user_id} для изображения {image_id} с действием {action}.")
     try:
-        if user_id not in user_images or int(image_id) not in user_images[user_id]:
+        if image_id not in images:
             return
-        image_data = user_images[user_id][int(image_id)]
+        image_data = images[image_id]
         invoice = image_data['invoice']
         message_id = image_data.get('message_id')
         logger.info(f"Получен message_id.{message_id}")
@@ -57,16 +58,13 @@ async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
 
         # Отправляем новое сообщение с ответом на оригинальное
         await bot.send_message(
-            chat_id=user_id,
+            chat_id=image_data['user_id'],
             text=f"{bot_message}",
             reply_to_message_id=image_data['message_id']  # Ответ на оригинальное сообщение
         )
-        
 
-        del user_images[user_id][int(image_id)]
+        del images[image_id]
 
-        if not user_images[user_id]:
-            del user_states[user_id]
 
     except Exception as e:
         logger.error(f"Ошибка при обработке callback-кнопки от пользователя {user_id}: {e}")
