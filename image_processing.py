@@ -94,7 +94,7 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
         if status == 'delivered':
             bot_message = f"Вы указали, что накладная {invoice} доставлена."
         elif status == 'received':
-            bot_message = f"Вы указали, что накладная {invoice} получена."
+            bot_message = f"Вы указали, что накладная {invoice} забрана."
         else:
             bot_message = f"Вы указали прочее для накладной {invoice}."
 

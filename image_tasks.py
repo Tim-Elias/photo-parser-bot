@@ -48,7 +48,7 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
                             reply_to_message_id=image_data['message_id'],  # Ответ на оригинальное сообщение
                             reply_markup=InlineKeyboardMarkup(
                                 inline_keyboard=[
-                                    [InlineKeyboardButton(text="Получено", callback_data=f"received:{image_id}")],
+                                    [InlineKeyboardButton(text="Забрана", callback_data=f"received:{image_id}")],
                                     [InlineKeyboardButton(text="Доставлено", callback_data=f"delivered:{image_id}")],
                                     [InlineKeyboardButton(text="Прочее", callback_data=f"other:{image_id}")]
                                 ]
