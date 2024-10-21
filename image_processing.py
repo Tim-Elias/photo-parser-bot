@@ -72,7 +72,7 @@ async def handle_image(message, user_id, is_document, bot):
                 "pil_image": pil_image  # Сохраняем изображение
             }
             logging.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice}.")
-            await process_image(message, user_id, image_id, bot)
+            await process_image(user_id, image_id, bot)
 
     except Exception as e:
         logging.error(f"Ошибка при обработке изображения: {e}")
