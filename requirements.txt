@@ -3,3 +3,10 @@ aiohttp
 openai
 aioboto3
 Pillow
+dotenv
+numpy
+opencv-python
+pytesseract
+requests
+openai
+pyzbar
