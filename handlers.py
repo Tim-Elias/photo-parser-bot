@@ -54,7 +54,7 @@ async def handle_inline_button(call: types.CallbackQuery, bot: Bot):
         await call.answer(text)
 
         # Удаляем предыдущее сообщение
-        await bot.delete_message(chat_id=user_id, message_id=image_data['new_message_id'])
+        await bot.delete_message(chat_id=image_data['user_id'], message_id=image_data['new_message_id'])
 
         # Отправляем новое сообщение с ответом на оригинальное
         await bot.send_message(

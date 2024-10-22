@@ -42,7 +42,7 @@ async def process_image(user_id: int, image_id: int, bot: Bot):
 
                     # Отправка уменьшенной копии изображения
                     sent_message = await bot.send_photo(
-                            user_id,
+                            image_data['user_id'],
                             input_file,
                             caption=f"Выберите действие для накладной {invoice}:",  # Текст с описанием
                             reply_to_message_id=image_data['message_id'],  # Ответ на оригинальное сообщение
