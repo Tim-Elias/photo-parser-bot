@@ -11,7 +11,7 @@ router = Router()
 @router.message(F.content_type == 'photo')
 async def handle_photo(message: types.Message, bot: Bot):
     logger.info("Обработка фотографии.")
-    user_id = int(message.from_user.id)
+    user_id = message.chat.id
     try:
         await handle_image(message, user_id, is_document=False, bot=bot)
     except TelegramForbiddenError:
@@ -22,7 +22,7 @@ async def handle_photo(message: types.Message, bot: Bot):
 @router.message(F.content_type == 'document')
 async def handle_document(message: types.Message, bot: Bot):
     logger.info("Обработка документа.")
-    user_id = int(message.from_user.id)
+    user_id = message.chat.id
     file_name = message.document.file_name
 
     try:
