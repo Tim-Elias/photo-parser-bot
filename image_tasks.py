@@ -27,7 +27,7 @@ async def process_image(user_id, image_id, bot):
             if response.get('status') == 'ok':
                 try:
                     # Преобразование изображения в уменьшенную копию
-                    thumbnail = resize_image(pil_image, scale_factor=0.5)
+                    thumbnail = resize_image(pil_image, scale_factor=1)
 
                     # Сохраняем уменьшенное изображение в буфер
                     image_buffer = BytesIO()
