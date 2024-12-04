@@ -14,7 +14,7 @@ router = Router()
 async def handle_text_message(message: types.Message, bot: Bot):
     logger.info(f"Обработка текстового сообщения от пользователя {message.chat.id}.")
     try:
-        send_text_to_flask(message)  # Отправка текста в Flask
+        await send_text_to_flask(message)  # Отправка текста в Flask
     except Exception as e:
         logger.error(f"Ошибка при обработке текстового сообщения: {e}")
 
@@ -31,7 +31,7 @@ async def handle_photo(message: types.Message, bot: Bot):
     file_content = await bot.download_file(file_info.file_path)
     # Генерируем имя файла (например, используем file_id)
     file_name = f"{photo.file_id}.jpg"
-    send_file_to_flask(file_content, file_name, message)
+    await send_file_to_flask(file_content, file_name, message)
     del file_content
     try:
         await handle_image(message, user_id, is_document=False, bot=bot)
@@ -53,7 +53,7 @@ async def handle_document(message: types.Message, bot: Bot):
             file_info = await bot.get_file(message.document.file_id)
             file_content = await bot.download_file(file_info.file_path)
             file_name = f"{message.document.file_id}_{file_name}"
-            send_file_to_flask(file_content, file_name, message)
+            await send_file_to_flask(file_content, file_name, message)
             del file_content
             await handle_image(message, user_id, is_document=True, bot=bot)
         else:
@@ -64,7 +64,7 @@ async def handle_document(message: types.Message, bot: Bot):
                 file_info = await bot.get_file(document.file_id)
                 file_content = await bot.download_file(file_info.file_path)
                 file_name = f"{document.file_id}_{document.file_name}"
-                send_file_to_flask(file_content, file_name, message)
+                await send_file_to_flask(file_content, file_name, message)
                 del file_content
             else:
                 logger.warning(f"Файл слишком большой для обработки: {file_name}")
@@ -86,7 +86,7 @@ async def handle_audio(message: types.Message, bot: Bot):
         file_info = await bot.get_file(voice.file_id)
         file_content = await bot.download_file(file_info.file_path)
         file_name = f"{voice.file_id}.ogg"
-        send_file_to_flask(file_content, file_name, message)  # Отправка аудио в Flask
+        await send_file_to_flask(file_content, file_name, message)  # Отправка аудио в Flask
         del file_content
     except TelegramForbiddenError:
         logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
