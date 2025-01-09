@@ -1,4 +1,6 @@
 import logging
+import os
+from dotenv import load_dotenv
 from aiogram import Bot, Router, types, F  # Используем F для фильтрации
 from state import images, user_states  # Глобальные переменные для состояния
 from image_processing import handle_image, invoice_processing  # Функции для обработки изображений
@@ -8,6 +10,10 @@ from flask_requests import send_file_to_flask, send_text_to_flask
 logger = logging.getLogger(__name__)
 # Создаем роутер для регистрации хендлеров
 router = Router()
+
+load_dotenv()
+
+not_allowed_chats = os.getenv("NOT_ALLOWED_CHATS").split(",")
 
 # Обработчик текстовых сообщений
 @router.message(F.content_type == 'text')
@@ -34,7 +40,8 @@ async def handle_photo(message: types.Message, bot: Bot):
     await send_file_to_flask(file_content, file_name, message)
     del file_content
     try:
-        await handle_image(message, user_id, is_document=False, bot=bot)
+        if user_id not in not_allowed_chats:
+            await handle_image(message, user_id, is_document=False, bot=bot)
     except TelegramForbiddenError:
         logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
     except Exception as e:
@@ -55,7 +62,8 @@ async def handle_document(message: types.Message, bot: Bot):
             file_name = f"{message.document.file_id}_{file_name}"
             await send_file_to_flask(file_content, file_name, message)
             del file_content
-            await handle_image(message, user_id, is_document=True, bot=bot)
+            if user_id not in not_allowed_chats:
+                await handle_image(message, user_id, is_document=True, bot=bot)
         else:
             # Для других документов
             logger.warning(f"Некорректный формат файла для пользователя {user_id}: {file_name}")
