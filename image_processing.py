@@ -50,6 +50,7 @@ async def handle_image(message, user_id, is_document, bot):
         base64_image = convert_image_to_base64(cv_image)
         invoice = get_QR(cv_image)
         logger.error(f"Извлекли номер из QR: {invoice}.")
+        error = None
         if invoice is None:
 
             invoice_data = await get_number_using_openai(cv_image)
@@ -57,18 +58,25 @@ async def handle_image(message, user_id, is_document, bot):
             invoice = invoice_data['number']
             error = invoice_data['error']
 
-        if invoice == "Номер накладной отсутствует":
-            if not error:
-                try:
-                    await bot.send_message(user_id, "Не удалось распознать номер.")
-                except TelegramForbiddenError:
-                    logger.error(
-                        f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
-                except Exception as e:
-                    logger.error(
-                        f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+        elif invoice == "Номер накладной отсутствует":
+            # Не продолжаем обработку
+            try:
+                await bot.send_message(user_id, "Не удалось распознать номер.")
+            except TelegramForbiddenError:
+                logger.error(
+                    f"Бот не может отправить сообщение пользователю {user_id}. Возможно, он заблокирован.")
+            except Exception as e:
+                logger.exception(
+                    f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+
+            if error:
                 logger.warning(
-                    f"Не удалось распознать номер для пользователя {user_id}.")
+                    f"Фото не является накладной для пользователя {user_id}.")
+            else:
+                logger.warning(
+                    f"Это накладная, но номер не удалось распознать для пользователя {user_id}.")
+            return
+
         else:
 
             image_id = str(uuid.uuid4())
