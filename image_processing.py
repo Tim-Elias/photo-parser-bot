@@ -59,7 +59,6 @@ async def handle_image(message, user_id, is_document, bot):
             logger.info(f"Получили номер через OpenAI: {invoice_data}")
 
             if invoice == "Номер накладной отсутствует":
-                # Не продолжаем обработку
                 try:
                     await bot.send_message(user_id, "Не удалось распознать номер накладной.")
                 except TelegramForbiddenError:
@@ -77,22 +76,21 @@ async def handle_image(message, user_id, is_document, bot):
                         f"Это накладная, но номер не удалось распознать для пользователя {user_id}.")
                 return
 
-        else:
+        # независимо от того, QR или OpenAI, если invoice найден — сохраняем
+        image_id = str(uuid.uuid4())
+        images[image_id] = {
+            "invoice": invoice,
+            "file_extension": file_extension,
+            "base64_image": base64_image,
+            "message_id": message.message_id,
+            "pil_image": pil_image,
+            "user_id": user_id,
+            "new_message_id": None
+        }
 
-            image_id = str(uuid.uuid4())
-            images[image_id] = {
-                "invoice": invoice,
-                "file_extension": file_extension,
-                "base64_image": base64_image,
-                "message_id": message.message_id,
-                "pil_image": pil_image,  # Сохраняем изображение
-                "user_id": user_id,
-                "new_message_id": None
-            }
-
-            logger.info(
-                f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice} с message_id: {images[image_id]['message_id']}.")
-            await process_image(user_id, image_id, bot)
+        logger.info(
+            f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice} с message_id: {images[image_id]['message_id']}.")
+        await process_image(user_id, image_id, bot)
 
     except Exception as e:
         logger.error(f"Ошибка при обработке изображения: {e}")
