@@ -4,7 +4,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BufferedIn
 from state import images, info_chat_ids
 from post_requests import post_and_process
 from utils import resize_image
-from image_processing import invoice_processing
+
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +77,7 @@ async def process_image(user_id, image_id, bot):
                             f"Отправлено сообщение c message_id: {image_data['message_id']}.")
 
                     else:
+                        from image_processing import invoice_processing
                         text, _ = await invoice_processing(invoice, image_data.get('base64_image'), image_data.get('file_extension'), "other")
                         await bot.send_message(
                             chat_id=image_data['user_id'],
