@@ -47,6 +47,8 @@ async def process_image(user_id, image_id, bot):
                         image_buffer.getvalue(), filename='thumbnail.jpg')
                     logger.info(
                         f"Отправляем ответ на сообщение: {image_data['message_id']}")
+                    logger.info(
+                        f"user_id: {user_id}, info_chat_ids: {info_chat_ids}")
                     if user_id not in info_chat_ids:
 
                         sent_message = await bot.send_photo(

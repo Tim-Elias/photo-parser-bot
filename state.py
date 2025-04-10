@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-info_chat_ids = os.getenv('INFO_CHAT_IDS').split(',')
+info_chat_ids = list(map(int, os.getenv('INFO_CHAT_IDS').split(',')))
 
 user_images = {}
 user_states = {}
