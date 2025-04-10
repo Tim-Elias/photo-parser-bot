@@ -52,30 +52,30 @@ async def handle_image(message, user_id, is_document, bot):
         logger.error(f"Извлекли номер из QR: {invoice}.")
         error = None
         if invoice is None:
-
             invoice_data = await get_number_using_openai(cv_image)
-            logger.error(f"Получили номер через openAI: {invoice_data}.")
             invoice = invoice_data['number']
             error = invoice_data['error']
 
-        elif invoice == "Номер накладной отсутствует":
-            # Не продолжаем обработку
-            try:
-                await bot.send_message(user_id, "Не удалось распознать номер.")
-            except TelegramForbiddenError:
-                logger.error(
-                    f"Бот не может отправить сообщение пользователю {user_id}. Возможно, он заблокирован.")
-            except Exception as e:
-                logger.exception(
-                    f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+            logger.info(f"Получили номер через OpenAI: {invoice_data}")
 
-            if error:
-                logger.warning(
-                    f"Фото не является накладной для пользователя {user_id}.")
-            else:
-                logger.warning(
-                    f"Это накладная, но номер не удалось распознать для пользователя {user_id}.")
-            return
+            if invoice == "Номер накладной отсутствует":
+                # Не продолжаем обработку
+                try:
+                    await bot.send_message(user_id, "Не удалось распознать номер накладной.")
+                except TelegramForbiddenError:
+                    logger.error(
+                        f"Бот не может отправить сообщение пользователю {user_id}. Возможно, он заблокирован.")
+                except Exception as e:
+                    logger.exception(
+                        f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+
+                if error:
+                    logger.warning(
+                        f"Фото не является накладной для пользователя {user_id}.")
+                else:
+                    logger.warning(
+                        f"Это накладная, но номер не удалось распознать для пользователя {user_id}.")
+                return
 
         else:
 
