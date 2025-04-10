@@ -1,25 +1,26 @@
 import io
+import uuid
 import logging
 from PIL import Image
 import numpy as np
+from aiogram.exceptions import TelegramForbiddenError
 import cv2
-from utils import get_QR
+from utils import get_QR, convert_image_to_base64
 from state import images  # Импортируем данные о пользователях из state
-from image_tasks import process_image  # Можно безопасно импортировать процессор изображения
+# Можно безопасно импортировать процессор изображения
+from image_tasks import process_image
 from openai_image_app import get_number_using_openai
-from utils import convert_image_to_base64, resize_image
 from s3_utils import S3Handler
 from post_requests import post_request
-from aiogram.exceptions import TelegramForbiddenError
-import uuid
+
 
 s3_handler = S3Handler()
 
 logger = logging.getLogger(__name__)
 
+
 async def handle_image(message, user_id, is_document, bot):
     logger.info(f"Обработка изображения от пользователя {user_id}.")
-
 
     try:
         if is_document:
@@ -30,14 +31,16 @@ async def handle_image(message, user_id, is_document, bot):
         file_path = file_info.file_path
         file_extension = file_path.split('.')[-1]
         downloaded_file = await bot.download_file(file_path)
-        image_stream = io.BytesIO(downloaded_file.getvalue())  # Получаем байтовые данные
+        # Получаем байтовые данные
+        image_stream = io.BytesIO(downloaded_file.getvalue())
 
         logger.info(f"Файл {file_path} загружен успешно.")
 
         # Открытие и обработка изображения
         try:
             pil_image = Image.open(image_stream)
-            pil_image = pil_image.convert("RGB")  # Убедимся, что изображение в RGB формате
+            # Убедимся, что изображение в RGB формате
+            pil_image = pil_image.convert("RGB")
             cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
 
         except Exception as e:
@@ -59,12 +62,15 @@ async def handle_image(message, user_id, is_document, bot):
                 try:
                     await bot.send_message(user_id, "Не удалось распознать номер.")
                 except TelegramForbiddenError:
-                    logger.error(f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
+                    logger.error(
+                        f"Бот не может отправить сообщение пользователю {user_id}. Возможно, бот заблокирован.")
                 except Exception as e:
-                    logger.error(f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
-                logger.warning(f"Не удалось распознать номер для пользователя {user_id}.")
+                    logger.error(
+                        f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
+                logger.warning(
+                    f"Не удалось распознать номер для пользователя {user_id}.")
         else:
-            
+
             image_id = str(uuid.uuid4())
             images[image_id] = {
                 "invoice": invoice,
@@ -76,7 +82,8 @@ async def handle_image(message, user_id, is_document, bot):
                 "new_message_id": None
             }
 
-            logger.info(f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice} с message_id: {images[image_id]['message_id']}.")
+            logger.info(
+                f"Изображение сохранено: {image_id} для пользователя {user_id} с накладной {invoice} с message_id: {images[image_id]['message_id']}.")
             await process_image(user_id, image_id, bot)
 
     except Exception as e:
@@ -85,14 +92,16 @@ async def handle_image(message, user_id, is_document, bot):
         if 'image_stream' in locals():
             image_stream.close()
 
+
 async def invoice_processing(invoice, base64_image, file_extension, status):
     logger.info(f"Обработка накладной: {invoice}, статус: {status}.")
 
     try:
         status_s3, s3_file_key = await s3_handler.post_s3(base64_image, file_extension)
         headers = {'Content-Type': 'application/json'}
-        
-        result = await post_request(invoice, s3_file_key, status, headers)  # Теперь это асинхронно
+
+        # Теперь это асинхронно
+        result = await post_request(invoice, s3_file_key, status, headers)
         logger.info(f"Результат запроса на сервер: {result}")
 
         # Формируем сообщение пользователю
@@ -104,7 +113,7 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
             bot_message = f"Вы указали прочее для накладной {invoice}."
 
         # Обработка результата
-        if result.get('error') == False:
+        if result.get('error') is False:
             if status_s3['status'] == 'created':
                 text = f"{bot_message} Скан успешно сохранен. {result.get('data')}"
                 logger.info(f"Успех: {text}")
@@ -122,5 +131,3 @@ async def invoice_processing(invoice, base64_image, file_extension, status):
             logger.error(f"Ошибка при обработке изображения: {error_msg}")
     except Exception as e:
         logger.error(f"Ошибка при обработке накладной: {e}")
-
-
