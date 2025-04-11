@@ -60,21 +60,22 @@ async def handle_image(message, user_id, is_document, bot):
 
             if invoice == "Номер накладной отсутствует":
                 try:
-                    await bot.send_message(user_id, "Не удалось распознать номер накладной.")
+                    if error:
+                        logger.warning(
+                            f"Фото не является накладной для пользователя {user_id}.")
+
+                    else:
+                        logger.warning(
+                            f"Это накладная, но номер не удалось распознать для пользователя {user_id}.")
+                        await bot.send_message(user_id, "Не удалось распознать номер накладной.")
+                    return
+
                 except TelegramForbiddenError:
                     logger.error(
                         f"Бот не может отправить сообщение пользователю {user_id}. Возможно, он заблокирован.")
                 except Exception as e:
                     logger.exception(
                         f"Ошибка при отправке сообщения пользователю {user_id}: {e}")
-
-                if error:
-                    logger.warning(
-                        f"Фото не является накладной для пользователя {user_id}.")
-                else:
-                    logger.warning(
-                        f"Это накладная, но номер не удалось распознать для пользователя {user_id}.")
-                return
 
         # независимо от того, QR или OpenAI, если invoice найден — сохраняем
         image_id = str(uuid.uuid4())
