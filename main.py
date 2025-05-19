@@ -6,17 +6,13 @@ from aiogram.types import Message
 from dotenv import load_dotenv
 from handlers import router  # Импортируем router из handlers
 from logger import setup_logging
-
 # Загрузить переменные окружения
 load_dotenv()
 API_TOKEN = os.getenv('TG_API_TOKEN')
 
 
 logger = setup_logging()
-# Пример использования логгера
 logger.info("Бот запущен!")
-
-
 # Создаем объекты бота и диспетчера
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
@@ -33,5 +29,5 @@ async def handle_start(message: Message):
 async def main():
     await dp.start_polling(bot)
 
-if "telegram_bot" == "__main__":
+if __name__ == "__main__":
     asyncio.run(main())
