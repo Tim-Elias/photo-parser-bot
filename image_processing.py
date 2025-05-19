@@ -6,8 +6,7 @@ import numpy as np
 from aiogram.exceptions import TelegramForbiddenError
 import cv2
 from utils import get_QR, convert_image_to_base64
-from state import images  # Импортируем данные о пользователях из state
-# Можно безопасно импортировать процессор изображения
+from state import images
 from image_tasks import process_image
 from openai_image_app import get_number_using_openai
 from s3_utils import S3Handler
@@ -16,7 +15,7 @@ from post_requests import post_request
 
 s3_handler = S3Handler()
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("telegram_bot")
 
 
 async def handle_image(message, user_id, is_document, bot):

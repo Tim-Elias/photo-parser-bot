@@ -3,7 +3,7 @@ aiohttp
 openai
 aioboto3
 Pillow
-dotenv
+python-dotenv
 numpy
 opencv-python
 pytesseract

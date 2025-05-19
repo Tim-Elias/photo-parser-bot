@@ -6,7 +6,7 @@ from post_requests import post_and_process
 from utils import resize_image
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("telegram_bot")
 
 # Функция для обработки изображения
 

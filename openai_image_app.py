@@ -13,7 +13,7 @@ from prompt import prompt, keywords
 import logging
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("telegram_bot")
 
 load_dotenv()
 

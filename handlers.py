@@ -8,7 +8,7 @@ from image_processing import handle_image, invoice_processing
 
 from flask_requests import send_file_to_flask, send_text_to_flask
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("telegram_bot")
 # Создаем роутер для регистрации хендлеров
 router = Router()
 

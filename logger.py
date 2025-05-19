@@ -1,21 +1,24 @@
 import logging
 import os
 
-# Убедимся, что директория для логов существует
-if not os.path.exists('logs'):
-    os.makedirs('logs')
 
-# Настроим логирование
-logging.basicConfig(
-    level=logging.INFO,  # Уровень логов
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Формат логов
-    handlers=[
-        logging.FileHandler('logs/bot.log', mode='a', encoding='utf-8'),  # Запись логов в файл
-        logging.StreamHandler()  # Дублирование логов в консоль
-    ]
-)
+def setup_logging(log_dir: str = "logs", log_filename: str = "bot.log", logger_name: str = "telegram_bot") -> logging.Logger:
+    # Убедимся, что директория для логов существует
+    os.makedirs(log_dir, exist_ok=True)
 
-logger = logging.getLogger(__name__)
+    # Полный путь до лог-файла
+    log_path = os.path.join(log_dir, log_filename)
 
-# Пример использования логгера
-logger.info("Бот запущен!")
+    # Настройка логирования
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_path, mode='a', encoding='utf-8'),
+            logging.StreamHandler()
+        ]
+    )
+
+    logger = logging.getLogger(logger_name)
+    logger.debug("Логгер инициализирован.")
+    return logger
